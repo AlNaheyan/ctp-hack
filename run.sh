@@ -9,7 +9,8 @@ APP_PROCESS="boringNotch"
 EXTENSION_PATH="$SCRIPT_DIR/extension"
 CHROME_PROFILE_PATH="$SCRIPT_DIR/.build/ChromeExtensionProfile"
 CHROME_BINARY="${GOOGLE_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
-API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://127.0.0.1:${PORT:-8787}}"
+API_PORT="${PORT:-3000}"
+API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://127.0.0.1:$API_PORT}"
 BACKEND_HEALTH_URL="$API_BASE_URL/healthz"
 BACKEND_LOG_PATH="$SCRIPT_DIR/.build/analysis-api.log"
 
@@ -44,7 +45,7 @@ else
   : > "$BACKEND_LOG_PATH"
 
   echo "Starting the analysis API at $API_BASE_URL…"
-  nohup npm run dev >"$BACKEND_LOG_PATH" 2>&1 &
+  nohup env PORT="$API_PORT" npm run dev >"$BACKEND_LOG_PATH" 2>&1 &
   backend_pid=$!
 
   attempts=0
