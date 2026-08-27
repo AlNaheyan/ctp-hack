@@ -1,181 +1,199 @@
-# Discussion Analyzer UX State Machine
+# Discussion Notch UX State Machine
 
-This specification is the W1-T3 source of truth for the macOS notch experience. It defines behavior only; implementation begins in W3-T3 and W3-T4.
+Status: Wave 1 implementation specification
 
-## Product boundary
+Owner: W1-T3
 
-The macOS app owns URL submission, cached analysis, timeline matching, and cards. The Chrome extension is a small playback observer. The backend processes a URL once and is not involved during synchronized playback.
+Implementation consumers: W2-T4, W3-T3, W3-T4
 
-The player owns time; the app observes time.
+## Product contract
 
-## Independent state axes
+The discussion feature analyzes one submitted YouTube video, activates that analysis only while Chrome reports the same `videoId`, and presents an insight when playback crosses its `triggerTime`. It is an additional notch activity, not a replacement for music, the shelf, battery status, or system HUDs.
 
-Do not model the feature as one large enum. These axes change independently and combine into the visible state.
+The MVP adds one discussion entry point to the existing expanded home surface. It does not add a settings screen, notification history, provider selector, or persistent card inbox.
 
-### Analysis loading
+## State model
 
-| State | Visible copy | Primary action | Recovery |
-| --- | --- | --- | --- |
-| `empty` | “Analyze a YouTube discussion” | Enter URL | None required |
-| `submitting` | “Checking video…” | Cancel | Returns to prior ready timeline or empty |
-| `processing` | “Analyzing the discussion…” | Cancel | Retry after typed failure |
-| `ready(videoId, timeline)` | “Insights ready” plus event count | Start/open video | Refresh analysis |
-| `noTranscript` | “No usable captions found” | Try another video | Retry after captions/language change |
-| `offline` | “Backend unavailable” | Retry | Use an unexpired local result if present |
-| `rateLimited` | “Analysis is busy” | Retry when allowed | Preserve entered URL |
-| `failed` | “Couldn’t analyze this video” | Retry | Show safe typed detail, never provider output |
-| `unsupportedSchema` | “App update required” | Dismiss | Never decode partially |
-
-Only the newest submission may update state. A later submission or cancellation makes earlier responses stale and ignored.
-
-### Browser connection
-
-| State | Notch indication | Behavior |
-| --- | --- | --- |
-| `notInstalled` | Setup hint in expanded view | No playback matching |
-| `disconnected` | Small outlined browser icon and “Connect Chrome” | Timeline remains cached and ready |
-| `connected(videoId)` | No persistent warning | Match only if video ID equals ready analysis |
-| `wrongVideo(expected, actual)` | “Open the analyzed video” | Suppress all insight triggers |
-| `stale` | “Playback connection lost” | Freeze observation; do not advance time locally |
-
-Connection warnings never erase analysis and never claim analysis failed.
-
-### Playback and presentation
-
-| State | Behavior |
-| --- | --- |
-| `idle` | No active matching session |
-| `playing` | Consume observed crossings |
-| `paused` | Keep current card readable; do not advance or retrigger |
-| `seeking` | Reset event pointer by binary search; do not emit skipped events |
-| `cardVisible(event)` | Present compact card; expanded detail available |
-| `queued(events)` | Preserve chronological order, bounded to three events |
-
-## Main transitions
-
-| From | Input | To | Side effect |
-| --- | --- | --- | --- |
-| Empty/failed | Valid URL submit | Submitting | Cancel previous request |
-| Submitting | Backend accepted/working | Processing | Keep URL visible |
-| Submitting/processing | Valid analysis | Ready | Atomically cache until `expiresAt` |
-| Ready | Matching browser video connects | Playing or paused | Reset pointer at observed time |
-| Ready | Different browser video connects | Wrong video | Show no cards |
-| Playing | `previous < trigger <= current` | Card visible | Dedupe `(videoId, event.id)` |
-| Any playback | `abs(current - previous) > 2` | Seeking | Binary-search next event, emit none |
-| Playing | Pause observation | Paused | Player remains sole clock |
-| Any | Browser video changes | Ready/wrong video | Clear active card, queue, pointer, and dedupe set |
-| Ready | Cache expires | Ready-stale | Keep usable data visible; refresh before next new session |
-
-## Trigger, replay, and queue policy
-
-1. Trigger only on a crossing: `previousTime < triggerTime <= currentTime`.
-2. Treat an absolute observed-time delta over 2 seconds as a seek. Reset to the first event after the new time and emit no event during that update.
-3. Mark an event shown by `(videoId, event.id)`.
-4. A backward seek re-arms an event only after playback moves to at least 0.5 seconds before its `startTime`. Ordinary time jitter does not re-arm it.
-5. Video change clears every shown marker because IDs are scoped to a video session.
-6. Show a card for 6 wall-clock seconds. Pausing the video does not dismiss it early.
-7. User dismissal ends the active card immediately but keeps it marked shown.
-8. Queue at most three crossed events in chronological order. If a fourth arrives, retain the earliest two and newest one, and expose “More insights available” in the expanded view.
-9. Events with equal `triggerTime` follow contract order: ascending stable ID.
-
-## Existing-notch precedence
-
-| Current surface | Incoming insight | Decision |
-| --- | --- | --- |
-| Volume, brightness, backlight, or mic HUD | Insight | Queue insight until HUD closes, for at most 5 seconds |
-| Battery power-status alert | Insight | Finish battery alert, then show insight |
-| File drag/drop or share picker | Insight | Queue without opening or stealing focus |
-| Webcam/mirror active | Insight | Show compact indicator only; expanded detail waits |
-| Music live activity | Insight | Insight temporarily replaces the compact music content; music state is preserved |
-| Existing insight | New insight | Add to bounded chronological queue |
-| Notch manually expanded | Insight | Insert card in discussion area without collapsing the notch |
-
-System controls and active user gestures win over informational cards. An insight is never allowed to break a drag, share, camera, or HUD interaction.
-
-## Card specification
-
-### Compact card
+Implementation should keep three orthogonal values rather than one enum containing every combination:
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│ ⚠ Claim needs support                 Speaker A · 88%    │
-│ States that rents fell sharply without naming a source.  │
-└──────────────────────────────────────────────────────────┘
+AnalysisState   = empty | submitting | processing(progress?) | ready(video) |
+                  failure(noTranscript | offline | backend)
+ConnectionState = disconnected | connected(playback)
+Presentation    = idle | cardVisible(event, deadline, expanded) | paused(event) |
+                  queued(events)
 ```
 
-- Maximum two title lines and two summary lines.
-- Type icon plus human title; never show raw snake-case type.
-- Speaker is one line and truncates before the title.
-- Confidence is visually secondary. Display as a rounded percentage, not a truth score.
-- Entire card opens expanded detail. A close control is separately accessible.
+Derived status is rendered from all three values. For example, `ready + disconnected + idle` displays **Chrome disconnected**, while `ready + connected(paused) + cardVisible` displays a card with a **Paused** playback badge. Analysis and connection state must not be destroyed when a transient card is shown or dismissed.
 
-### Expanded card
+All state mutation and presentation deadlines run on the main actor. A new submission cancels the old request logically (late responses are ignored by request ID), clears the event queue, and replaces the active analysis only after the new response validates.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Possible unsupported claim                         [Close]   │
-│ Speaker A · 1:38 · Confidence 88%                            │
-│                                                              │
-│ States that rents fell forty percent without naming a        │
-│ source or a time period.                                     │
-│                                                              │
-│ Context                                                      │
-│ “Rents came down by about forty percent…”                     │
-│                                                              │
-│ [Open at 1:32]                             [Dismiss]          │
-└──────────────────────────────────────────────────────────────┘
-```
+## State and transition table
 
-- Summary may use four lines; evidence may use three.
-- Overflow ends with an ellipsis; full text is available to VoiceOver and a future history view.
-- “Open at” uses `startTime`, while the header timestamp uses `triggerTime`.
-- No like/dislike or verdict controls in the MVP.
+| Visible state | Entry condition | Compact/closed copy | Expanded copy and controls | Recovery or exit |
+|---|---|---|---|---|
+| Empty | No accepted analysis | No discussion activity | **Analyze a YouTube discussion**; URL field; **Analyze** | Paste/type a URL, then Analyze. Invalid input stays here with inline **Enter a YouTube video URL** and focused field. |
+| Submitting | Valid URL accepted; request not acknowledged | Spinner + **Sending…** | **Sending video…**; disabled URL field; **Cancel** | Cancel returns to the previous ready analysis, otherwise Empty. Network response advances to Processing or an error. |
+| Processing | Request acknowledged; analysis pending | Spinner + **Analyzing…** | **Analyzing discussion**; indeterminate progress; submitted video title when available; **Cancel** | Cancel returns to previous ready analysis/Empty. Success enters Ready; failure enters an error. Do not invent a percentage unless supplied by a future contract. |
+| Ready | Valid analysis cached | Checkmark + **Analysis ready** for 3 s, then no compact takeover | Title, event count, connection/playback status, **Replace video** | Matching playback enters Playing/Paused. Replace starts a new submission. |
+| Disconnected | No fresh native playback message for 5 s, or host unavailable | Only shown on explicit connection loss: link-slash + **Chrome disconnected** for 4 s | **Chrome disconnected**; **Open Chrome and play this video**; **Retry connection** | A valid matching playback message reconnects automatically. Retry asks the existing bridge to reconnect; it does not discard analysis. |
+| Playing | Matching video, `paused == false` | No takeover between events | Green play badge + current time and analyzed title | Pause enters Paused. Trigger crossing proposes Card visible. |
+| Paused | Matching video, `paused == true` | No takeover unless a card is already visible | **Paused at m:ss**; card deadline is frozen | Resume restarts the remaining card deadline. Seek/rewind rules still apply. |
+| Card visible | Eligible event wins arbitration | Type icon, one-line title, m:ss; dismiss affordance on hover/focus | Full card; type, title, summary, confidence treatment, **Open at m:ss**, **Dismiss** | Auto-dismiss after the timing below, explicit Dismiss, video change, or replacement analysis. |
+| No transcript | API typed error indicates unavailable captions | Caption-slash + **No transcript** for 4 s | **No transcript available**; **Try another video**; **Retry** | Retry resubmits the same URL; Try another focuses a cleared URL field. |
+| Offline | Reachability failure/timeout with no server response | Wifi-slash + **You’re offline** for 4 s | **Can’t reach the analyzer**; **Retry**; preserve entered URL and prior ready analysis | Retry same request. Automatic reachability recovery may enable Retry but must not submit without user action. |
+| Backend error | Server, decoding, validation, or unsupported-schema error | Exclamation + **Analysis failed** for 4 s | **Analysis couldn’t be completed**; short safe reason; **Retry**; **Try another video** | Retry same request. Never expose response bodies, stack traces, transcript text, or secrets. Unsupported schema adds **Update the app and try again** and disables Retry. |
 
-## Type presentation
+When a prior ready analysis exists, submission/processing/errors appear in the expanded surface without deactivating it until a replacement succeeds. The prior analysis remains eligible only for its own `videoId`.
 
-| Contract type | Display label | Symbol suggestion | Tone |
-| --- | --- | --- | --- |
-| `unsupported_claim` | Claim needs support | `questionmark.circle` | Amber |
-| `contradiction` | Possible contradiction | `arrow.triangle.2.circlepath` | Purple |
-| `strawman` | Position may be reframed | `person.crop.circle.badge.questionmark` | Orange |
-| `evasion` | Question may be unanswered | `arrow.turn.up.right` | Blue |
-| `missing_premise` | Reasoning skips a step | `link.badge.plus` | Teal |
+## Card content and layout
 
-Color is supplemental; symbol and text always carry meaning. Copy uses “possible,” “may,” or “needs support” because analysis is fallible.
+Wireframes and truncation examples are in [discussion-card-wireframes.md](discussion-card-wireframes.md).
 
-## Error and recovery copy
+Compact presentation occupies the existing closed-notch live-activity lane. It shows:
 
-| Contract error | User-facing title | Recovery |
-| --- | --- | --- |
-| `INVALID_YOUTUBE_URL` | “Enter a YouTube video link” | Return focus to URL field |
-| `VIDEO_PRIVATE` | “This video is private” | Choose another video |
-| `VIDEO_NOT_FOUND` | “Video not found” | Check link or choose another |
-| `CAPTIONS_DISABLED` | “Captions are disabled” | Choose a captioned video |
-| `UNSUPPORTED_LANGUAGE` | “Caption language isn’t supported yet” | Choose another language/video |
-| `TRANSCRIPT_UNAVAILABLE` | “No usable transcript found” | Retry or choose another video |
-| `ANALYSIS_FAILED` | “Analysis couldn’t finish” | Retry; preserve URL |
-| `UPSTREAM_TIMEOUT` | “Analysis is taking too long” | Retry; use valid cache if present |
-| `UNSUPPORTED_SCHEMA_VERSION` | “App update required” | Dismiss and update |
-| `INTERNAL_ERROR` | “Something went wrong” | Retry; show request ID if supplied |
+1. leading symbol colored by insight type;
+2. a single-line title, tail-truncated;
+3. `m:ss` trigger time; and
+4. an accessibility-labelled dismiss button revealed on hover or keyboard focus.
 
-## Accessibility and motion
+It must not marquee. The compact title receives all flexible width and may collapse to 80 pt; time and icon never truncate. If the physical notch leaves insufficient room, show icon plus time and expose the full title through the accessibility label.
 
-- Compact VoiceOver label order: type, title, speaker, summary, confidence, timestamp.
-- Do not announce confidence as certainty; say “model confidence 88 percent.”
-- Close, open-at-time, retry, refresh, and cancel are keyboard reachable.
-- Minimum interactive target is 28×28 points in the compact notch and 36×36 when expanded.
-- Respect Reduce Motion by replacing scale/bounce with opacity under 150 ms.
-- Respect Increase Contrast and never encode type using color alone.
-- New cards use a polite live-region announcement and never interrupt a system HUD announcement.
+Expanded presentation fits the existing 640×190 surface with 12 pt exterior padding. The content region is at most 616×142 below the existing header. The title uses two lines, the summary three lines, and evidence one line when space remains. Truncation is at the tail, never by shrinking below the user’s selected text size. Hover or keyboard focus pauses auto-dismiss so content can be read. The accessible value contains the untruncated title, summary, speaker, confidence description, and timestamp.
 
-## Contract audit
+Insight types use an SF Symbol plus a text label; color is redundant:
 
-The v1 analysis contract already supplies every MVP field: `videoId`, timeline expiry, stable event ID, interval times, speaker, closed type, title, summary, confidence, and evidence. Playback v1 supplies video ID, current time, duration, paused state, rate, and observation time. W1-T3 requires no schema change.
+| `type` value | Label | Symbol | Accent |
+|---|---|---|---|
+| `unsupported_claim` | Needs support | `questionmark.bubble` | amber |
+| `contradiction` | Possible contradiction | `arrow.triangle.2.circlepath` | purple |
+| `strawman` | Position may be reframed | `person.2` | orange |
+| `evasion` | Question may be unanswered | `arrow.turn.up.right` | blue |
+| `missing_premise` | Reasoning skips a step | `link.badge.plus` | teal |
 
-## Implementation boundaries
+These are the complete v1 values. An unknown type fails contract validation before
+presentation; adding a type requires a new compatible contract decision and UI mapping.
 
-- W2-T4 implements timing, dedupe, queue input, and cache semantics without SwiftUI.
-- W3-T3 implements card views and coordinator precedence.
-- W3-T4 implements submission/loading and maps typed errors to this copy.
-- W3-T2 supplies connection state but does not choose product copy.
-- MVP adds a discussion surface to the existing notch; it does not add a new settings architecture.
+### Confidence treatment
+
+Confidence is supporting metadata, never a quality grade or progress bar. Expanded cards translate the numeric value to **High confidence** (`>= 0.80`), **Medium confidence** (`>= 0.60`), or **Low confidence** (`< 0.60`). Low confidence also displays **Review context** and uses a neutral accent. Compact cards omit confidence. VoiceOver reads the label, not the raw decimal. Invalid values are a contract-validation error and never reach presentation.
+
+### Actions
+
+- **Open at m:ss** opens `https://www.youtube.com/watch?v={videoId}&t={floor(startTime)}s`. Use `startTime`, not `triggerTime`, so the user hears the relevant context. The app validates/percent-encodes the ID and uses the normal workspace-opening API.
+- **Dismiss** marks only the current presentation dismissed. The timeline engine’s dedupe remains authoritative; the event may replay only after the rewind rule below.
+- `Escape` dismisses the card. `Return`/`Space` invokes the focused action. When focus is nowhere inside the card, `Return` opens at timestamp.
+
+No extra API field is needed for either action.
+
+## Timing, queueing, and playback
+
+### Display timing
+
+- A compact card auto-dismisses after 8 seconds of actual playback time.
+- Opening/expanding the notch promotes the same card and preserves its remaining time, with a minimum of 8 seconds after expansion.
+- Expanded cards auto-dismiss after 15 seconds.
+- Pause, pointer hover, keyboard focus, VoiceOver interaction, and a higher-priority interruption freeze the deadline.
+- On resume/reveal, continue the remaining deadline with a 3-second minimum.
+- Reduced Motion replaces scale/spring movement with a 0.15-second opacity transition. It does not change dwell time.
+
+Deadlines use a monotonic clock, not `observedAt` or video time.
+
+### Trigger and replay rules
+
+- Emit on `previousTime < triggerTime <= currentTime`; never compare floating-point times for equality.
+- A playback delta whose absolute value exceeds 2 seconds is a seek. Binary-search to the new position and emit no skipped event.
+- Forward seeks do not show events crossed by the seek.
+- A rewind at or before an event’s `triggerTime` re-arms that event. It may show again on the next natural forward crossing.
+- Jitter of 2 seconds or less does not re-arm an event once shown.
+- Pause freezes the visible card and queue. Resuming continues it; pausing exactly after a crossing does not duplicate it.
+- Playback-rate changes do not change wall-clock dwell time or crossing semantics.
+- A `videoId` change immediately dismisses the visible card, clears the queue and dedupe set, and renders Ready with **Play the analyzed video** if the new ID does not match. Returning to the analyzed video starts matching from the first fresh position without emitting already-passed events.
+
+### Rapid events
+
+The first eligible event presents immediately. Later eligible events use a FIFO queue capped at 3 waiting cards. Event IDs already visible/queued are ignored. Each queued card gets its full dwell time when revealed.
+
+If the cap is exceeded, retain the earliest two waiting events and replace the third slot with the newest event. The dropped event remains deduped for that forward pass. This bounds interruption while retaining immediate context and the latest development. Explicit dismissal advances to the next queued card after a 0.2-second transition. A seek, video change, or replacement analysis clears the queue.
+
+## Activity collision decisions
+
+Only one closed-notch transient owns the presentation lane. Expanded user-selected content is never navigated away automatically.
+
+| Collision | Winner | Discussion behavior | Recovery/resume |
+|---|---|---|---|
+| System HUD (volume, brightness, keyboard backlight, microphone) vs card | HUD | Freeze and hide card; keep its queue position | Reveal card after HUD ends, with at least 3 s remaining |
+| Critical battery (system low-battery warning) vs card | Battery | Freeze and hide card | Reveal afterward with at least 3 s remaining |
+| Routine power-source/charging notice vs card | Visible card | Queue/coalesce battery notice through existing battery manager | Battery notice displays after card; never extend card |
+| Music live activity vs card | Card for its dwell time | Temporarily replace closed music content; playback continues | Music returns immediately after queue empties |
+| Shelf drag/drop vs card | Shelf | Do not cover drop target; freeze card | Reveal when drag/drop session ends |
+| User manually opens notch vs compact card | User-opened surface | Promote card within discussion area; do not replace Shelf if Shelf is selected | Card remains reachable on Home; deadline freezes while another tab has focus |
+| Error/status toast vs insight card | Existing insight card | Error waits as a single coalesced status item | Show status for 4 s after insight queue drains |
+| Two insight events | Current card | FIFO policy above | Next card follows dismissal/deadline |
+| New video or new accepted analysis vs card | New context | Dismiss and clear without animation | Show matching Ready/Disconnected state |
+
+Priority, highest first: **user interaction/drag > system HUD > critical battery > discussion card > routine battery/status > music > idle face**. This priority applies only to the closed-notch transient lane. It does not change the current expanded tab or steal keyboard focus.
+
+## Recovery decision table
+
+| Condition detected | User-facing copy | Primary action | Preserved state |
+|---|---|---|---|
+| URL missing/malformed/unsupported host | Enter a YouTube video URL | Focus URL field | Current analysis |
+| Request cancelled | Analysis cancelled | Analyze | Entered URL, current analysis |
+| Captions unavailable | No transcript available | Try another video | Failed URL for Retry |
+| Offline/DNS/timeout | Can’t reach the analyzer | Retry | URL and current analysis |
+| HTTP 5xx/provider failure | Analysis couldn’t be completed | Retry | URL and current analysis |
+| HTTP 4xx typed validation error | This video can’t be analyzed | Try another video | Safe error category only |
+| Unsupported schema version | Update the app and try again | Dismiss | Current analysis; Retry disabled |
+| Invalid response/event bounds | Analysis response was invalid | Retry | Current analysis; invalid data is not cached |
+| Native host missing/disconnected | Chrome disconnected | Retry connection | Cached analysis and queue (queue expires on video change) |
+| Playback video differs | Play the analyzed video | Open analyzed video | Cached analysis; no cards emitted |
+| Cache expired and offline | Saved analysis expired | Retry when online | Video title/URL only; expired events inactive |
+
+Retries are explicit, idempotent, and show Submitting immediately. After three consecutive backend failures, copy remains the same; the UI does not add a new workflow or settings dependency.
+
+Typed API errors map to those recovery states as follows:
+
+| v1 error code | UI state | Retry behavior |
+|---|---|---|
+| `INVALID_REQUEST`, `INVALID_YOUTUBE_URL` | Invalid URL/request | Correct or replace the URL |
+| `VIDEO_PRIVATE`, `VIDEO_NOT_FOUND`, `CAPTIONS_DISABLED`, `UNSUPPORTED_LANGUAGE`, `TRANSCRIPT_UNAVAILABLE` | No transcript / video unavailable | Try another video; offer Retry only when `retryable` is true |
+| `ANALYSIS_FAILED`, `UPSTREAM_TIMEOUT`, `INTERNAL_ERROR` | Backend error | Respect the response `retryable` value |
+| `UNSUPPORTED_SCHEMA_VERSION` | Update required | Disable Retry |
+
+Transport failures with no typed response use Offline. The server's safe `message` may
+supplement the fixed copy, but `code` and `retryable` control behavior.
+
+## Accessibility and resilient copy
+
+- VoiceOver sees each card as a named group and announces: “Discussion insight, {type}, {title}, at {time}.” It does not automatically read transcript evidence over other audio. Actions follow in visual order.
+- New cards use a polite announcement and never move keyboard focus. Critical errors use an assertive announcement once.
+- Full Keyboard Access exposes URL field, Analyze/Cancel/Retry, Open at timestamp, and Dismiss with visible focus rings. Focus returns to the element that opened the card or the discussion entry point after dismissal.
+- Text and icons meet WCAG 2.1 AA contrast (4.5:1 for normal text; 3:1 for large text and controls) against the black notch. Meaning never depends on color.
+- At larger accessibility text sizes, the expanded card scrolls vertically inside its fixed surface; actions remain pinned and reachable. Compact mode falls back to icon/time rather than clipping vertically.
+- Long copy uses line limits described above, preserves whole words where SwiftUI allows, and exposes full content to VoiceOver and Help on hover. Do not use marquee text for discussion content.
+- Reduced Transparency uses opaque black and solid separators. Increase Contrast strengthens borders and secondary text. Differentiate Without Color adds the type label even where a symbol would normally suffice.
+
+## UI contract handoff
+
+W3-T3 may consume all fields already proposed by W1-T2:
+
+| Field | UI use |
+|---|---|
+| response `videoId`, `title` | matching, ready state, open URL, context label |
+| event `id` | queue identity and dedupe with `videoId` |
+| `startTime`, `triggerTime`, `endTime` | open context, trigger crossing, contextual interval |
+| `speaker` | required expanded metadata; it may be visually deprioritized when space is constrained |
+| `type` | label/symbol mapping for the closed v1 enum above |
+| `title`, `summary`, `evidence` | compact title and expanded content |
+| `confidence` | expanded qualitative confidence label |
+
+The UI requires no field addition. Processing remains indeterminate because the contract has no progress value. Connection freshness and `paused` come from playback messages; presentation deadlines and request IDs are local state.
+
+## Acceptance checklist
+
+- Every asynchronous state above has visible copy and at least one recovery/exit action.
+- Long title and summary behavior is defined for both notch sizes and accessibility sizes.
+- Natural crossings, pause, seek, rewind, jitter, rapid events, and video changes have deterministic behavior.
+- Collision priority preserves existing HUD, battery, music, shelf, and expanded-tab behavior.
+- MVP uses the existing home surface and local presentation state; it requires no settings architecture.
