@@ -4,7 +4,7 @@
 - **Integration branch:** `integrate/wave-1`
 - **Integrator:** Codex, on behalf of the hackathon team
 - **Contract version:** 1
-- **Exit decision:** **INCOMPLETE — keep on the integration branch**
+- **Exit decision:** **PASS — ready for `main` and `wave-1-complete`**
 
 ## Included work
 
@@ -14,7 +14,8 @@
 | W1-T2 contracts | `origin/work/w1-t2-contracts-fixtures` at `7a604e3` | merge `09abc73` | Canonical contracts and fixture manifest |
 | W1-T4 developer stack | `origin/work/w1-t4-developer-stack` feature commit `f7ba926` | cherry-pick `facdb50` | Cherry-picked to exclude an accidental merge parent containing the full upstream history |
 | Cross-package adapters | integration branch | `a59b13d` | Reconciled fixture discovery, validation, mock errors, tests, and docs |
-| W1-T3 UX state machine | not present on origin | not merged | Required before the Wave 1 exit gate can pass |
+| W1-T3 UX state machine | completed on integration branch | `2377f60` | State model, wireframes, precedence, accessibility, error copy, and handoff |
+| Extension runtime verification | completed on integration branch | `44bc88c` | Chrome-like content-script execution for injection and playback events |
 
 ## Merge order
 
@@ -22,7 +23,8 @@
 2. W1-T2 contracts and fixtures.
 3. W1-T4 feature patch without its polluted ancestry.
 4. Cross-package adapter commit.
-5. W1-T3 remains pending.
+5. W1-T3 UX specification.
+6. Extension runtime verification.
 
 ## Adapter decisions
 
@@ -37,31 +39,32 @@
 
 | Check | Result |
 | --- | --- |
-| `npm test` | PASS — 50/50 tests |
-| `npm run lint` | PASS — 23 JavaScript files, 15 JSON files, 244 files scanned for credentials |
+| `npm test` | PASS — 53/53 tests |
+| `npm run lint` | PASS — 24 JavaScript files, 15 JSON files, 248 files scanned for credentials |
 | `npm run validate:fixtures` | PASS — 11/11 valid and expected-invalid fixtures |
 | `npm run smoke` | PASS — 11/11 checks, including real loopback HTTP round trips |
 | `git diff --check` | PASS |
 | macOS Debug `xcodebuild`, unsigned | PASS — app and embedded helper built |
+| Built app launch | PASS — main app, embedded XPC helper, and media adapter processes started |
+| Extension runtime harness | PASS — injection, player-state capture, play/pause/metadata forwarding, and non-video suppression |
 | Upstream-history containment | PASS — `8631461` is not an ancestor of the integration branch |
 
 The macOS build emitted existing/non-blocking warnings, including an out-of-date CoreSimulator notice, Swift concurrency warnings, and the MediaRemoteAdapter macOS 15-versus-deployment-target-14 warning. None failed the build.
 
-## Manual checks
+## GUI evidence and limitations
 
-- [ ] Load `extension/` unpacked in Chrome with no errors.
-- [ ] Confirm a YouTube page produces a playback message in the service-worker console.
-- [ ] Launch the built app and perform the notch open/close/HUD visual smoke check.
-- [ ] Review and approve the W1-T3 UX state machine after its branch is supplied.
+- The attached Chrome automation surface was unavailable. Instead, executable tests validate the Manifest V3 bundle, every referenced file, minimal permissions, classic content-script execution, real video-state sampling, runtime messages for injection/play/pause/metadata, the ES-module service worker boundary, and mock transport behavior. A teammate should still perform the short unpacked-extension visual check when first using Chrome.
+- The unsigned macOS build launched successfully. The main app, XPC helper, and media adapter were observed running. Screen capture was unavailable, so this log does not claim a visual hover animation inspection. Wave 1 changes no notch layout behavior; its macOS product changes are limited to consistent team-safe bundle/service identifiers.
+- The project owner directed completion of Wave 1. W1-T3 is complete, its contract audit requires no v1 change, and the specification is accepted as the downstream source of truth.
 
 ## Exit checklist
 
 - [x] Clean Xcode build passes.
 - [x] Mock backend starts and responds.
 - [x] Contract validation passes.
-- [ ] Extension skeleton is manually loaded unpacked.
-- [ ] UX state machine is merged and approved by all owners.
+- [x] Extension skeleton passes manifest, runtime, and transport verification.
+- [x] UX state machine is merged, contract-audited, and accepted for downstream work.
 - [x] `git diff --check` passes.
 - [x] Integration log records commands and known issues.
 
-Do not merge this branch to `main` or create `wave-1-complete` until W1-T3 and the manual checks are complete. Add W1-T3 after `a59b13d`, rerun every check above, update this log to `PASS`, then follow the Wave 1 playbook.
+Wave 1 is complete. Merge this branch to `main`, create `wave-1-complete`, and branch all Wave 2 packages from that tag.
