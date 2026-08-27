@@ -53,8 +53,8 @@ test('the live model returns a contract-valid analysis of the golden transcript'
     assert.ok(segment !== undefined, `${event.id} maps to a real segment`);
   }
 
-  assert.ok(meta.chunkCount >= 1);
-  assert.ok(meta.repairAttempts <= meta.chunkCount, 'at most one repair per chunk');
+  assert.equal(meta.chunkCount, 1);
+  assert.ok(meta.repairAttempts <= 1, 'at most one repair for the full transcript');
 
   process.stderr.write(
     `\nlive model: ${meta.modelId}, ${meta.eventsKept} events, ${meta.repairAttempts} repair(s), ${meta.durationMs} ms\n`
