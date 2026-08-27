@@ -206,6 +206,7 @@ struct ExpandedDiscussionInsightCard: View {
     let onOpen: () -> Void
     let onDismiss: () -> Void
     let onHover: (Bool) -> Void
+    var onPreferredHeightChange: (CGFloat) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -224,25 +225,35 @@ struct ExpandedDiscussionInsightCard: View {
 
                 Text(event.title)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                     .help(event.title)
 
-                Text(event.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .help(event.summary)
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(event.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .help(event.summary)
 
-                Spacer(minLength: 0)
+                        if !event.evidence.isEmpty {
+                            Text("“\(event.evidence)”")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .help(event.evidence)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 4)
+                }
+                .scrollIndicators(.automatic)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .contentShape(Rectangle())
+                .textSelection(.enabled)
 
                 HStack(spacing: 8) {
-                    if !event.evidence.isEmpty {
-                        Text("“\(event.evidence)”")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .help(event.evidence)
-                    }
                     Spacer(minLength: 4)
                     Button("Open at \(discussionTime(event.startTime))", action: onOpen)
                         .buttonStyle(.borderless)
@@ -262,6 +273,8 @@ struct ExpandedDiscussionInsightCard: View {
         }
         .contentShape(Rectangle())
         .onHover(perform: onHover)
+        .onAppear { onPreferredHeightChange(preferredCardHeight) }
+        .onChange(of: event.id) { _, _ in onPreferredHeightChange(preferredCardHeight) }
         .onExitCommand(perform: onDismiss)
         .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .contain)
@@ -297,6 +310,43 @@ struct ExpandedDiscussionInsightCard: View {
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
+    }
+
+    private var preferredCardHeight: CGFloat {
+        // Available text width at the standard 640-point notch width after the
+        // outer inset, card padding, icon column, and spacing are removed.
+        let textWidth: CGFloat = 500
+        let titleHeight = measuredHeight(
+            event.title,
+            font: .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold),
+            width: textWidth
+        )
+        let summaryHeight = measuredHeight(
+            event.summary,
+            font: .systemFont(ofSize: NSFont.smallSystemFontSize),
+            width: textWidth
+        )
+        let evidenceHeight = event.evidence.isEmpty
+            ? 0
+            : measuredHeight(
+                "“\(event.evidence)”",
+                font: .systemFont(ofSize: NSFont.smallSystemFontSize - 1),
+                width: textWidth
+            ) + 6
+
+        // Metadata, action row, card padding, and VStack spacing are fixed.
+        return ceil(68 + titleHeight + summaryHeight + evidenceHeight)
+    }
+
+    private func measuredHeight(_ text: String, font: NSFont, width: CGFloat) -> CGFloat {
+        guard !text.isEmpty else { return 0 }
+        return ceil(
+            (text as NSString).boundingRect(
+                with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font]
+            ).height
+        )
     }
 }
 
