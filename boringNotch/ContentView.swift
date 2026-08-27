@@ -14,8 +14,11 @@ struct ContentView: View {
     @State private var closeTask: Task<Void, Never>?
     @State private var isHovering = false
 
+    private let contentHorizontalInset: CGFloat = 24
+    private let contentBottomInset: CGFloat = 18
+
     private let interactionSpring = Animation.interactiveSpring(
-        response: 0.38,
+        response: 0.54,
         dampingFraction: 0.8,
         blendDuration: 0
     )
@@ -36,8 +39,9 @@ struct ContentView: View {
                             .frame(height: max(24, vm.effectiveClosedNotchHeight))
 
                         NotchHomeView(model: discussion)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 12)
+                            .padding(.top, 4)
+                            .padding(.horizontal, contentHorizontalInset)
+                            .padding(.bottom, contentBottomInset)
                     }
                 } else {
                     Color.clear
@@ -56,8 +60,8 @@ struct ContentView: View {
             .onHover(perform: handleHover)
             .animation(
                 vm.notchState == .open
-                    ? .spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-                    : .spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0),
+                    ? .spring(response: 0.56, dampingFraction: 0.8, blendDuration: 0)
+                    : .spring(response: 0.62, dampingFraction: 1.0, blendDuration: 0),
                 value: vm.notchState
             )
         }
