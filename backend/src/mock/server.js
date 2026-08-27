@@ -17,7 +17,7 @@ import { assertSecretsForMode, describeConfig, loadConfig, loadDotEnv } from '..
 import { AppError, SCHEMA_VERSION, toErrorResponse } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { listAnalysisFixtureIds, loadAnalysisFixture } from '../fixtures.js';
-import { requireVideoId } from './video-url.js';
+import { requireVideoId } from '../transcript/video-url.js';
 import {
   SCENARIO_DESCRIPTIONS,
   applyScenario,

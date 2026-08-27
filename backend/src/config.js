@@ -37,7 +37,10 @@ const DEFAULTS = Object.freeze({
   HOST: '127.0.0.1',
   LOG_LEVEL: 'info',
   MOCK_LATENCY_MS: '0',
-  MOCK_SCENARIO: 'ok'
+  MOCK_SCENARIO: 'ok',
+  TRANSCRIPT_LANGUAGE: 'en-US',
+  TRANSCRIPT_TIMEOUT_MS: '10000',
+  TRANSCRIPT_CACHE_TTL_MS: '86400000'
 });
 
 /** Secrets that live mode needs, with the reason shown when one is missing. */
@@ -61,6 +64,16 @@ function parseInteger(value, name, { min = 0, max = Number.MAX_SAFE_INTEGER }) {
     );
   }
   return parsed;
+}
+
+function parseLanguage(value) {
+  const language = String(value);
+  if (!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(language)) {
+    throw new ConfigError(
+      `TRANSCRIPT_LANGUAGE must be a BCP 47 language tag such as en or en-US. Got "${language}". Fix it in .env (see .env.example).`
+    );
+  }
+  return language;
 }
 
 /**
@@ -103,7 +116,16 @@ export function loadConfig(env = process.env) {
     logLevel: String(read('LOG_LEVEL')).toLowerCase(),
     fixturesDir,
     mockLatencyMs: parseInteger(read('MOCK_LATENCY_MS'), 'MOCK_LATENCY_MS', { min: 0, max: 60000 }),
-    mockScenario: scenario
+    mockScenario: scenario,
+    transcriptLanguage: parseLanguage(read('TRANSCRIPT_LANGUAGE')),
+    transcriptTimeoutMs: parseInteger(read('TRANSCRIPT_TIMEOUT_MS'), 'TRANSCRIPT_TIMEOUT_MS', {
+      min: 100,
+      max: 60000
+    }),
+    transcriptCacheTtlMs: parseInteger(read('TRANSCRIPT_CACHE_TTL_MS'), 'TRANSCRIPT_CACHE_TTL_MS', {
+      min: 1000,
+      max: 7 * 24 * 60 * 60 * 1000
+    })
   });
 }
 
@@ -173,6 +195,7 @@ export function describeConfig(config, env = process.env) {
     `log level      ${config.logLevel}`,
     `mock scenario  ${config.mockScenario}`,
     `mock latency   ${config.mockLatencyMs} ms`,
+    `transcript     ${config.transcriptLanguage}, ${config.transcriptTimeoutMs} ms timeout`,
     ...describeSecrets(env).map((secret) => `${secret.name.padEnd(14)} ${secret.status}`)
   ];
 }

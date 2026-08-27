@@ -21,6 +21,9 @@ test('defaults to mock mode with no environment set', () => {
   assert.equal(config.fixturesDir, DEFAULT_FIXTURES_DIR);
   assert.equal(config.mockScenario, 'ok');
   assert.equal(config.mockLatencyMs, 0);
+  assert.equal(config.transcriptLanguage, 'en-US');
+  assert.equal(config.transcriptTimeoutMs, 10000);
+  assert.equal(config.transcriptCacheTtlMs, 86400000);
 });
 
 test('rejects an unknown mode with an actionable message', () => {
@@ -34,6 +37,20 @@ test('rejects an unknown mode with an actionable message', () => {
 
 test('rejects a non-numeric port', () => {
   assert.throws(() => loadConfig({ PORT: 'eight' }), /PORT must be an integer/);
+});
+
+test('validates transcript timeout and cache bounds', () => {
+  assert.throws(() => loadConfig({ TRANSCRIPT_LANGUAGE: '../en' }), /TRANSCRIPT_LANGUAGE must be a BCP 47/);
+  assert.throws(() => loadConfig({ TRANSCRIPT_TIMEOUT_MS: '99' }), /TRANSCRIPT_TIMEOUT_MS must be an integer/);
+  assert.throws(() => loadConfig({ TRANSCRIPT_CACHE_TTL_MS: '999' }), /TRANSCRIPT_CACHE_TTL_MS must be an integer/);
+  const config = loadConfig({
+    TRANSCRIPT_LANGUAGE: 'fr-CA',
+    TRANSCRIPT_TIMEOUT_MS: '12000',
+    TRANSCRIPT_CACHE_TTL_MS: '60000'
+  });
+  assert.equal(config.transcriptLanguage, 'fr-CA');
+  assert.equal(config.transcriptTimeoutMs, 12000);
+  assert.equal(config.transcriptCacheTtlMs, 60000);
 });
 
 test('mock mode requires no secrets', () => {

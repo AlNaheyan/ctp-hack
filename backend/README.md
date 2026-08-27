@@ -26,7 +26,12 @@ backend/
     mock/
       server.js        the mock HTTP API
       scenarios.js     latency and failure simulation
-      video-url.js     mock-only URL parsing (W2-T1 supersedes it)
+    transcript/
+      video-url.js     strict production YouTube URL parser
+      youtube-provider.js public watch-page caption adapter
+      normalizer.js    provider cues to transcript contract v1
+      cache.js         24-hour in-process cache
+      service.js       callable W3-T1 boundary
   test/                node --test suites, no network
 ```
 
@@ -41,6 +46,57 @@ backend/
 Keep new work behind the interfaces already here: read configuration from
 `config.js`, raise `AppError` with a code from `errors.js`, and log through
 `logger.js` so no transcript text or secret reaches stdout.
+
+## Transcript ingestion (W2-T1)
+
+W3-T1 consumes the service directly; W2-T1 deliberately adds no HTTP route:
+
+```js
+import { MemoryTranscriptCache, createTranscriptService } from './src/transcript/index.js';
+
+const transcripts = createTranscriptService({
+  timeoutMs: config.transcriptTimeoutMs,
+  cache: new MemoryTranscriptCache({ ttlMs: config.transcriptCacheTtlMs }),
+  logger
+});
+
+const transcript = await transcripts.getTranscript({
+  url: 'https://www.youtube.com/watch?v=PRU2ShMzQRg',
+  language: config.transcriptLanguage
+});
+```
+
+`getTranscript({ url | videoId, language?, captionSource?, forceRefresh?, signal? })`
+returns the normalized `contracts/transcript.schema.json` object. The provider
+boundary is `fetchTranscript({ videoId, language, captionSource?, signal })`, so
+tests and future authenticated providers do not depend on the public YouTube
+adapter.
+
+Caption selection prefers an exact BCP 47 language, then its base language;
+manual tracks beat automatic tracks within a language match. Callers may force
+`captionSource: 'manual' | 'automatic'`. If no matching track exists, the
+service returns `UNSUPPORTED_LANGUAGE` rather than silently translating or
+choosing an unrelated language.
+
+The cache key is `<videoId>:<lowercase-language>:<manual|automatic>`. Default
+TTL is 24 hours and the in-process cache holds 100 least-recently-used entries.
+The default network timeout is 10 seconds across metadata and caption fetches.
+Logs contain only video id, language, caption source, segment count, cache key,
+and outcome—never URL query data or transcript text.
+
+The official captions download API requires OAuth permission to edit a video,
+so arbitrary public videos use a replaceable watch-page caption adapter. Run
+the deterministic suite offline with `npm run test:backend`. An opt-in live
+check is available and may be affected by YouTube bot/network policy:
+
+```bash
+RUN_YOUTUBE_LIVE_TEST=1 npm run test:backend
+```
+
+Typed ingestion failures are `INVALID_YOUTUBE_URL`, `VIDEO_PRIVATE`,
+`VIDEO_NOT_FOUND`, `CAPTIONS_DISABLED`, `UNSUPPORTED_LANGUAGE`,
+`TRANSCRIPT_UNAVAILABLE`, and `UPSTREAM_TIMEOUT`. Provider details are retained
+only as error causes and are never placed in the wire-safe message.
 
 ## Configuration
 
