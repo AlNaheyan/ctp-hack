@@ -58,6 +58,8 @@ class BoringNotchSkyLightWindow: NSPanel {
         titlebarAppearsTransparent = true
         backgroundColor = .clear
         isMovable = false
+        becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         level = .mainMenu + 3
         hasShadow = false
         isReleasedWhenClosed = false
@@ -109,6 +111,16 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     private var observers: Set<AnyCancellable> = []
     
-    override var canBecomeKey: Bool { false }
+    // The discussion URL field must be editable. Because this remains a
+    // non-activating panel and becomesKeyOnlyIfNeeded is enabled, playback
+    // observation does not steal focus unless the user selects the field.
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, !isKeyWindow {
+            makeKey()
+        }
+        super.sendEvent(event)
+    }
 }
