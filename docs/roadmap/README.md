@@ -49,6 +49,21 @@ flowchart LR
 | [3](wave-3-integration.md) | Connect the components at stable seams | `W3-T1`–`W3-T4` | URL-to-cards and playback-to-card paths work independently |
 | [4](wave-4-demo.md) | Make the full demo reliable and distributable | `W4-T1`–`W4-T4` | A clean Mac can run the scripted demo twice without manual repair |
 
+Each ticket above has its own contributor document. Use the [four-person integration strategy](merge-strategy.md) and the merge playbook linked from each wave before advancing to the next wave.
+
+## Suggested four-person assignment
+
+This keeps context reasonably stable while rotating the integration burden. Replace Person A–D with names in your team notes.
+
+| Person | Wave 1 | Wave 2 | Wave 3 | Wave 4 |
+| --- | --- | --- | --- | --- |
+| A — macOS/platform | W1-T1 | W2-T4 | W3-T2 | W4-T3 |
+| B — backend/data | W1-T2 | W2-T1 | W3-T1 | W4-T2 |
+| C — AI/product UI | W1-T3 | W2-T2 | W3-T3 | W4-T4 |
+| D — browser/integration | W1-T4 | W2-T3 | W3-T4 | W4-T1 |
+
+The person assigned W4-T1 is the final integration lead. For Waves 1–3, choose a wave integrator from someone whose own package has already passed review; integration begins only after all four package pull requests are ready.
+
 ## Shared API contract target
 
 Wave 1 owns the exact schema. Downstream tickets should expect this shape, not invent alternatives:
