@@ -5,6 +5,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { DEFAULT_GEMINI_MODEL, createGeminiProvider, toGeminiSchema } from '../../src/analysis/providers/gemini.js';
+
+test('uses Gemini 3.6 Flash by default', () => {
+  assert.equal(DEFAULT_GEMINI_MODEL, 'gemini-3.6-flash');
+});
 import { RESPONSE_SCHEMA } from '../../src/analysis/prompt.js';
 
 const FAKE_KEY = 'not-a-real-key'; // lint-allow-secret
@@ -54,7 +58,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
 
   const result = await provider.generate(request);
 
-  assert.match(seen.url, /models\/gemini-2\.5-flash:generateContent$/);
+  assert.match(seen.url, /models\/gemini-3\.6-flash:generateContent$/);
   assert.equal(seen.init.headers['x-goog-api-key'], FAKE_KEY);
   assert.equal(seen.url.includes(FAKE_KEY), false, 'the key never lands in the URL');
 
