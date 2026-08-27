@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "videoId": "demoTalk001",
+  "language": "en-US",
+  "captionSource": "manual",
+  "fetchedAt": "2026-08-27T15:58:00Z",
+  "segments": [
+    {
+      "id": "seg_001",
+      "startTime": 12.4,
+      "endTime": 23.1,
+      "speaker": "Maya Chen",
+      "text": "Almost every serious injury downtown is caused by a car, so the center should be car-free."
+    },
+    {
+      "id": "seg_002",
+      "startTime": 24.0,
+      "endTime": 30.4,
+      "speaker": "Jon Bell",
+      "text": "I could support a temporary weekend pilot if deliveries still get through."
+    },
+    {
+      "id": "seg_003",
+      "startTime": 31.2,
+      "endTime": 43.6,
+      "speaker": "Jon Bell",
+      "text": "Remove the curb parking and those shops lose their customers."
+    },
+    {
+      "id": "seg_004",
+      "startTime": 52.0,
+      "endTime": 64.8,
+      "speaker": "Maya Chen",
+      "text": "Jon wants every parking space protected forever, but public streets should serve everyone."
+    },
+    {
+      "id": "seg_005",
+      "startTime": 75.1,
+      "endTime": 88.4,
+      "speaker": "Jon Bell",
+      "text": "I never supported trying this, even for a weekend."
+    },
+    {
+      "id": "seg_006",
+      "startTime": 91.0,
+      "endTime": 96.0,
+      "speaker": "Jon Bell",
+      "text": "What would installing the barriers and signs cost?"
+    },
+    {
+      "id": "seg_007",
+      "startTime": 96.3,
+      "endTime": 108.2,
+      "speaker": "Maya Chen",
+      "text": "The important thing is that everyone deserves to feel safe downtown."
+    }
+  ]
+}

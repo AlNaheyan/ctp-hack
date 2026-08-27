@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "videoId": "demoTalk001",
+  "title": "Should Cities Make Downtown Car-Free?",
+  "generatedAt": "2026-08-27T16:00:00Z",
+  "expiresAt": "2026-08-28T16:00:00Z",
+  "events": [
+    {
+      "id": "evt_unsupported_001",
+      "startTime": 12.4,
+      "triggerTime": 17.8,
+      "endTime": 23.1,
+      "speaker": "Maya Chen",
+      "type": "unsupported_claim",
+      "title": "Safety claim needs a source",
+      "summary": "Maya attributes nearly all downtown injuries to cars without citing supporting data.",
+      "confidence": 0.92,
+      "evidence": "Almost every serious injury downtown is caused by a car."
+    },
+    {
+      "id": "evt_premise_001",
+      "startTime": 31.2,
+      "triggerTime": 36.5,
+      "endTime": 43.6,
+      "speaker": "Jon Bell",
+      "type": "missing_premise",
+      "title": "Access is assumed to require parking",
+      "summary": "Jon's conclusion assumes customers cannot reach stores without parking directly outside them.",
+      "confidence": 0.84,
+      "evidence": "Remove the curb parking and those shops lose their customers."
+    },
+    {
+      "id": "evt_strawman_001",
+      "startTime": 52.0,
+      "triggerTime": 57.25,
+      "endTime": 64.8,
+      "speaker": "Maya Chen",
+      "type": "strawman",
+      "title": "Delivery concern is overstated",
+      "summary": "Maya recasts a request for delivery access as a demand to preserve every parking space.",
+      "confidence": 0.88,
+      "evidence": "Jon wants every parking space protected forever."
+    },
+    {
+      "id": "evt_contradiction_001",
+      "startTime": 75.1,
+      "triggerTime": 81.0,
+      "endTime": 88.4,
+      "speaker": "Jon Bell",
+      "type": "contradiction",
+      "title": "Pilot position changes",
+      "summary": "Jon now rejects any trial after earlier saying a temporary weekend pilot was reasonable.",
+      "confidence": 0.95,
+      "evidence": "I never supported trying this, even for a weekend."
+    },
+    {
+      "id": "evt_evasion_001",
+      "startTime": 96.3,
+      "triggerTime": 101.6,
+      "endTime": 108.2,
+      "speaker": "Maya Chen",
+      "type": "evasion",
+      "title": "Cost question goes unanswered",
+      "summary": "Maya responds to a question about implementation cost by returning to the safety goal.",
+      "confidence": 0.86,
+      "evidence": "The important thing is that everyone deserves to feel safe downtown."
+    }
+  ]
+}
