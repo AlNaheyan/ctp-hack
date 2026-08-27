@@ -8,7 +8,7 @@
 import { TAXONOMY, TAXONOMY_VERSION } from './taxonomy.js';
 
 /** Bump on any change to the instructions or the response shape. */
-export const PROMPT_VERSION = 'argument-analysis-2.0.0';
+export const PROMPT_VERSION = 'argument-analysis-2.1.0';
 
 /** Model-facing length targets. The contract ceilings are higher; these keep cards readable. */
 export const FIELD_LIMITS = Object.freeze({
@@ -48,7 +48,7 @@ const taxonomyBlock = () =>
     (entry) => `- ${entry.id}: ${entry.definition}\n  When to report: ${entry.requirement}`
   ).join('\n');
 
-/** System instruction. Stable across chunks so providers can cache it. */
+/** System instruction. Stable across requests so providers can cache it. */
 export function buildSystemPrompt() {
   return [
     'You are a strict debate-analysis engine, not a conversational assistant.',
@@ -79,7 +79,7 @@ export function buildSystemPrompt() {
     'Grounding and writing rules:',
     '1. Reference the real segment id where enough information exists to justify the classification.',
     '2. Quote evidence verbatim from that referenced segment. Never fabricate, paraphrase as a quote, combine text across segments, or quote a segment other than segmentId.',
-    '3. For contradiction, strawman, or evasion, the earlier statement or question must also appear in the supplied chunk. Explain the relationship concisely in summary; do not invent missing context.',
+    '3. For contradiction, strawman, or evasion, use the full supplied transcript to connect the earlier statement or question to the later response. Explain the relationship concisely in summary; do not invent missing context.',
     '4. Keep title neutral and descriptive. Never write that someone is lying, definitely wrong, or definitively committed a fallacy.',
     '5. Keep summary neutral, understandable by itself, and at most 20 words. State what happened, not a moral judgment.',
     '6. Confidence measures certainty that the text fits the classification, not certainty that a claim is factually true.',
@@ -116,7 +116,7 @@ export function buildChunkPrompt(chunk, context = {}) {
   const header = [
     context.videoTitle ? `Discussion: ${context.videoTitle}` : null,
     context.language ? `Language: ${context.language}` : null,
-    `Chunk ${chunk.index + 1}, segments ${segments[0].id} to ${segments[segments.length - 1].id}.`
+    `Full transcript, segments ${segments[0].id} to ${segments[segments.length - 1].id}.`
   ]
     .filter(Boolean)
     .join('\n');
@@ -128,7 +128,7 @@ export function buildChunkPrompt(chunk, context = {}) {
     JSON.stringify(segments, null, 2),
     'END TRANSCRIPT DATA',
     '',
-    `Report argument-quality issues in these segments. Keep title under ${FIELD_LIMITS.title} characters,`,
+    `Report argument-quality issues across this entire discussion. Keep title under ${FIELD_LIMITS.title} characters,`,
     `summary under ${FIELD_LIMITS.summary}, and evidence under ${FIELD_LIMITS.evidence}.`,
     'Return only {"findings": [...]}.'
   ].join('\n');

@@ -125,13 +125,26 @@ test('a transcript with nothing to report yields an empty, still-valid timeline'
   assert.deepEqual(validateAnalysisResponse(analysis), { valid: true, errors: [] });
 });
 
-test('duplicate findings from overlapping chunks are collapsed', async () => {
-  const { analysis, meta } = await analyze(GOLDEN_TRANSCRIPT, { maxChunkChars: 120, overlapSegments: 2 });
+test('the entire transcript is sent in one model request', async () => {
+  const longTranscript = {
+    ...GOLDEN_TRANSCRIPT,
+    segments: Array.from({ length: 442 }, (_, index) => ({
+      id: `seg_${String(index + 1).padStart(3, '0')}`,
+      startTime: index * 2,
+      endTime: index * 2 + 1.5,
+      speaker: index % 2 === 0 ? 'Speaker A' : 'Speaker B',
+      text: `Argument segment ${index + 1}: ${'context '.repeat(20).trim()}`
+    }))
+  };
+  const provider = scriptedProvider([{ findings: [] }]);
+  const { meta } = await analyzeTranscript(longTranscript, { provider, now: FIXED_NOW });
 
-  assert.ok(meta.chunkCount > 1, 'the transcript was split');
-  const ids = analysis.events.map((event) => event.id);
-  assert.deepEqual(ids, [...new Set(ids)], 'no duplicate events survive');
-  assert.deepEqual(validateAnalysisResponse(analysis), { valid: true, errors: [] });
+  assert.equal(provider.calls.length, 1);
+  assert.equal(meta.chunkCount, 1);
+  assert.equal(meta.segmentCount, 442);
+  assert.match(provider.calls[0].user, /Full transcript/);
+  assert.match(provider.calls[0].user, new RegExp(longTranscript.segments[0].id));
+  assert.match(provider.calls[0].user, new RegExp(longTranscript.segments.at(-1).id));
 });
 
 test('unusable output is repaired once and then succeeds', async () => {

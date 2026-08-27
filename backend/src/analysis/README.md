@@ -4,7 +4,7 @@ Turns a normalized transcript into evidence-grounded, contract-valid insight
 events.
 
 ```text
-transcript -> chunker -> prompt -> provider -> validator -> postprocess -> analysis response
+transcript -> prompt -> provider -> validator -> postprocess -> analysis response
                                     (Gemini or offline stub)
 ```
 
@@ -35,9 +35,6 @@ analyzeTranscript(transcript, {
   provider,                  // required: ModelProvider
   title?,                    // discussion title for the response payload
   now?,                      // () => Date, injected clock for deterministic tests
-  maxChunkChars?,            // default 6000
-  overlapSegments?,          // default 2
-  maxChunkSegments?,         // default 120
   minConfidence?,            // default 0 (keep everything the model reports)
   cacheTtlSeconds?,          // default 86400
   signal?,                   // AbortSignal
@@ -54,7 +51,7 @@ the response**:
 | `providerName`, `modelId` | Which model produced this |
 | `promptVersion`, `taxonomyVersion`, `schemaVersion` | Cache invalidation |
 | `cacheKey`, `cacheKeyParts` | Ready-made cache identity for W3-T1 |
-| `chunkCount`, `segmentCount`, `findingsReturned`, `eventsKept` | Volume |
+| `chunkCount`, `segmentCount`, `findingsReturned`, `eventsKept` | Volume (`chunkCount` is retained for compatibility and is always 1) |
 | `dropped`, `removed` | Why findings did not become events, by reason |
 | `groundingFallbacks`, `truncated`, `repairAttempts`, `sizeTrimmed` | Quality signals |
 | `durationMs` | Timing |
@@ -118,17 +115,12 @@ guessed at. Evidence is checked against the segment text (ignoring case and
 punctuation); if the quote is not really there, it is replaced with the
 segment's own words and counted in `meta.groundingFallbacks`.
 
-## Chunking
+## Full-transcript context
 
-Long transcripts are split on segment boundaries: 6000 characters or 120
-segments per chunk, whichever comes first, with the last 2 segments repeated at
-the start of the next chunk so a contradiction that spans a boundary is still
-visible. Segments are never split or reworded, and the overlap is capped so the
-window always advances. Duplicate findings from the overlap are removed by
-postprocess.
-
-Chunks are analysed sequentially: predictable provider rate limits, and a
-failure is attributable to one chunk. W3-T1 may add bounded concurrency.
+Every normalized transcript is sent to the provider in one request. It is not
+split by character count or segment count, so later exchanges can be evaluated
+against statements, questions, and premises from anywhere earlier in the
+video. `meta.chunkCount` remains for compatibility and is always `1`.
 
 ## Validation, clamping, and dedupe
 
@@ -150,7 +142,7 @@ Events are returned sorted by `triggerTime`, then `id`, as the contract requires
 
 ## Retry policy
 
-One repair attempt per chunk. The repair request repeats the transcript (the
+One repair attempt per transcript. The repair request repeats the transcript (the
 provider is stateless) and appends what was wrong with the previous answer. If
 the second attempt is still unusable, the whole analysis fails with
 `ANALYSIS_FAILED` and `details.chunkIndex` - a partial timeline is never
@@ -169,7 +161,7 @@ All from the closed enum in `contracts/api-error.schema.json`:
 | `INTERNAL_ERROR` | Bug in this pipeline (missing provider, output that fails the contract) | no |
 
 Provider response bodies are never forwarded. Errors carry at most the HTTP
-status, the provider's own short status string, and the chunk index.
+status, the provider's own short status string, and the compatibility chunk index (`0`).
 
 ## Prompt injection
 
@@ -202,8 +194,8 @@ test is skipped with a printed reason unless both the flag and a key are present
 
 ## Known limitations
 
-- A contradiction whose setup falls more than two segments before the chunk
-  boundary can be missed. Raise `overlapSegments` for long transcripts.
+- Very long transcripts must fit within the selected model's input-context
+  limit because the analyzer intentionally does not split them.
 - The stub provider is cue-phrase matching, not analysis. Judge output quality
   with `--live`.
 - `minConfidence` defaults to 0: nothing is filtered by confidence unless a

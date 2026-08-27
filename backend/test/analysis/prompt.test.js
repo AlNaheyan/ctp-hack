@@ -96,9 +96,10 @@ test('transcript text is delivered as quoted JSON data, inside explicit markers'
   assert.equal(parsed[0].startTime, 12.4, 'timings survive into the prompt');
 });
 
-test('the chunk prompt states the field limits it expects', () => {
+test('the transcript prompt states the field limits it expects', () => {
   const user = buildChunkPrompt(chunk, {});
 
+  assert.match(user, /Full transcript/);
   assert.match(user, new RegExp(String(FIELD_LIMITS.title)));
   assert.match(user, new RegExp(String(FIELD_LIMITS.summary)));
   assert.match(user, new RegExp(String(FIELD_LIMITS.evidence)));
