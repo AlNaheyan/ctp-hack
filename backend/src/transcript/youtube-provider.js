@@ -1,4 +1,8 @@
 import { AppError } from '../errors.js';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const MAX_WATCH_BYTES = 5 * 1024 * 1024;
 const MAX_CAPTION_BYTES = 5 * 1024 * 1024;
@@ -11,10 +15,16 @@ const YOUTUBE_ORIGIN = 'https://www.youtube.com';
  * page is an upstream implementation detail and may change independently.
  */
 export class YouTubeCaptionProvider {
-  constructor({ fetchImpl = globalThis.fetch, origin = YOUTUBE_ORIGIN } = {}) {
+  constructor({
+    fetchImpl = globalThis.fetch,
+    origin = YOUTUBE_ORIGIN,
+    ytDlpFallback = fetchTranscriptWithYtDlp
+  } = {}) {
     if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl must be a function');
+    if (typeof ytDlpFallback !== 'function') throw new TypeError('ytDlpFallback must be a function');
     this.fetchImpl = fetchImpl;
     this.origin = origin;
+    this.ytDlpFallback = ytDlpFallback;
   }
 
   /**
@@ -63,19 +73,24 @@ export class YouTubeCaptionProvider {
         'user-agent': 'BoringNotchDiscussionAnalyzer/0.1'
       }
     });
-    if (!captionResponse.ok) {
-      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube did not return the selected caption track.', {
-        retryable: captionResponse.status >= 500 || captionResponse.status === 429
-      });
+    let payload;
+    if (captionResponse.ok) {
+      const source = await readBoundedText(captionResponse, MAX_CAPTION_BYTES, 'caption track');
+      try {
+        payload = JSON.parse(source);
+      } catch {
+        // YouTube sometimes advertises a public timed-text URL but answers the
+        // anonymous request with an empty HTML body. yt-dlp uses YouTube's
+        // current player clients and is the local-development fallback.
+      }
     }
 
-    const source = await readBoundedText(captionResponse, MAX_CAPTION_BYTES, 'caption track');
-    let payload;
-    try {
-      payload = JSON.parse(source);
-    } catch {
-      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube returned an unreadable caption track.', {
-        retryable: true
+    if (payload === undefined) {
+      return this.ytDlpFallback({
+        videoId,
+        language: track.languageCode,
+        captionSource: sourceForTrack(track),
+        signal
       });
     }
 
@@ -86,6 +101,92 @@ export class YouTubeCaptionProvider {
       cues: json3Cues(payload)
     };
   }
+}
+
+/** Retrieve JSON3 captions through the locally installed yt-dlp executable. */
+export async function fetchTranscriptWithYtDlp({
+  videoId,
+  language,
+  captionSource,
+  signal,
+  spawnImpl = spawn
+}) {
+  const workingDirectory = await mkdtemp(join(tmpdir(), 'boring-notch-captions-'));
+  try {
+    const outputTemplate = join(workingDirectory, '%(id)s.%(ext)s');
+    const captionFlag = captionSource === 'automatic' ? '--write-auto-subs' : '--write-subs';
+    await runYtDlp([
+      '--no-update',
+      '--skip-download',
+      captionFlag,
+      '--sub-langs', language,
+      '--sub-format', 'json3',
+      '--no-playlist',
+      '--output', outputTemplate,
+      `https://www.youtube.com/watch?v=${videoId}`
+    ], { signal, spawnImpl });
+
+    const captionFiles = (await readdir(workingDirectory))
+      .filter((name) => name.endsWith('.json3'))
+      .sort();
+    if (captionFiles.length === 0) {
+      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp did not return the selected caption track.', {
+        retryable: true
+      });
+    }
+
+    const captionPath = join(workingDirectory, captionFiles[0]);
+    const metadata = await stat(captionPath);
+    if (metadata.size > MAX_CAPTION_BYTES) {
+      throw new AppError(
+        'TRANSCRIPT_UNAVAILABLE',
+        `YouTube caption track exceeds the ${MAX_CAPTION_BYTES}-byte limit.`
+      );
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(await readFile(captionPath, 'utf8'));
+    } catch {
+      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp returned an unreadable caption track.', {
+        retryable: true
+      });
+    }
+
+    return {
+      videoId,
+      language,
+      captionSource,
+      cues: json3Cues(payload)
+    };
+  } finally {
+    await rm(workingDirectory, { recursive: true, force: true });
+  }
+}
+
+function runYtDlp(arguments_, { signal, spawnImpl }) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnImpl('yt-dlp', arguments_, {
+        signal,
+        stdio: ['ignore', 'ignore', 'ignore']
+      });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve();
+      else {
+        reject(new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp could not retrieve captions from YouTube.', {
+          retryable: true
+        }));
+      }
+    });
+  });
 }
 
 /** Parse the balanced ytInitialPlayerResponse object from a watch page. */

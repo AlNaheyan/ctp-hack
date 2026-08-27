@@ -79,6 +79,36 @@ test('fetches the selected caption track through the provider boundary', async (
   assert.match(calls[1], /fmt=json3/);
 });
 
+test('falls back to yt-dlp when the advertised caption response is empty', async () => {
+  const fallbackCalls = [];
+  const fallbackResult = {
+    videoId: VIDEO_ID,
+    language: 'en',
+    captionSource: 'automatic',
+    cues: [{ startMs: 1000, durationMs: 750, text: 'Fallback caption' }]
+  };
+  let calls = 0;
+  const provider = new YouTubeCaptionProvider({
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return new Response(watchPage(player({ tracks: [track('en', 'asr')] })));
+      return new Response('', { headers: { 'content-type': 'text/html' } });
+    },
+    ytDlpFallback: async (request) => {
+      fallbackCalls.push(request);
+      return fallbackResult;
+    }
+  });
+
+  assert.deepEqual(
+    await provider.fetchTranscript({ videoId: VIDEO_ID, language: 'en-US' }),
+    fallbackResult
+  );
+  assert.equal(fallbackCalls.length, 1);
+  assert.equal(fallbackCalls[0].language, 'en');
+  assert.equal(fallbackCalls[0].captionSource, 'automatic');
+});
+
 test('maps private, deleted, captions-disabled, and unsupported-language videos', async () => {
   const cases = [
     [player({ status: { status: 'LOGIN_REQUIRED', reason: 'This is a private video' } }), 'VIDEO_PRIVATE'],

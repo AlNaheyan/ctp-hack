@@ -194,7 +194,7 @@ curl -X POST http://127.0.0.1:8787/v1/analyze \
 | `PORT` / `HOST` | `8787` / `127.0.0.1` | Listen address |
 | `ANALYSIS_MODE` | `mock` | Fixture + stub, or YouTube + Gemini |
 | `TRANSCRIPT_LANGUAGE` | `en-US` | Default caption preference |
-| `TRANSCRIPT_TIMEOUT_MS` | `10000` | Caption retrieval deadline |
+| `TRANSCRIPT_TIMEOUT_MS` | `30000` | Caption retrieval deadline, including the local yt-dlp fallback |
 | `ANALYSIS_TIMEOUT_MS` | `30000` | Per model request deadline |
 | `API_REQUEST_TIMEOUT_MS` | `90000` | Whole cold request deadline |
 | `ANALYSIS_CACHE_TTL_MS` | `86400000` | Result reuse window (24 h) |

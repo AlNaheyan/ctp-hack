@@ -65,8 +65,9 @@ stop_backend() {
   fi
 }
 
-if ! command -v node >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
-  echo "Node.js 20.10+ and curl are required to start and check the analysis API." >&2
+if ! command -v node >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v yt-dlp >/dev/null 2>&1; then
+  echo "Node.js 20.10+, curl, and yt-dlp are required to start the analysis API." >&2
+  echo "Install yt-dlp on macOS with: brew install yt-dlp" >&2
   exit 1
 fi
 

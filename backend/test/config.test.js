@@ -22,7 +22,7 @@ test('defaults to mock mode with no environment set', () => {
   assert.equal(config.mockScenario, 'ok');
   assert.equal(config.mockLatencyMs, 0);
   assert.equal(config.transcriptLanguage, 'en-US');
-  assert.equal(config.transcriptTimeoutMs, 10000);
+  assert.equal(config.transcriptTimeoutMs, 30000);
   assert.equal(config.transcriptCacheTtlMs, 86400000);
   assert.equal(config.analysisTimeoutMs, 30000);
   assert.equal(config.geminiModel, undefined);

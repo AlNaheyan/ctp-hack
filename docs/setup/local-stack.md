@@ -71,7 +71,7 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 | `MOCK_LATENCY_MS` | `0` | Artificial analyze latency, 0-60000 |
 | `MOCK_SCENARIO` | `ok` | Default scenario for every request |
 | `TRANSCRIPT_LANGUAGE` | `en-US` | W2-T1 caption preference: exact language, then base language |
-| `TRANSCRIPT_TIMEOUT_MS` | `10000` | W2-T1 overall YouTube request timeout, 100-60000 ms |
+| `TRANSCRIPT_TIMEOUT_MS` | `30000` | W2-T1 overall YouTube request timeout, including the yt-dlp fallback, 100-60000 ms |
 | `TRANSCRIPT_CACHE_TTL_MS` | `86400000` | W2-T1 in-process normalized transcript cache TTL |
 | `ANALYSIS_TIMEOUT_MS` | `30000` | W2-T2 model request timeout, 1000-300000 ms |
 | `API_REQUEST_TIMEOUT_MS` | `90000` | W3-T1 deadline for one cold request, 1000-600000 ms |
