@@ -7,6 +7,7 @@
 //
 
 import Combine
+import DiscussionTimeline
 import SwiftUI
 
 struct DiscussionPlaybackSnapshot: Equatable, Sendable {
@@ -69,18 +70,41 @@ struct DiscussionInsight: Identifiable, Equatable, Sendable {
 final class DiscussionSessionModel: ObservableObject {
     enum Status: Equatable {
         case empty
-        case waitingForAnalysis
-        case ready(eventCount: Int)
+        case submitting
+        case processing
+        case ready(eventCount: Int, cached: Bool)
         case invalidURL
         case browserDisconnected
+        case noTranscript(message: String, retryable: Bool)
+        case offline
+        case backend(message: String, retryable: Bool)
+        case updateRequired
 
         var message: String {
             switch self {
             case .empty: "Paste a YouTube discussion link"
-            case .waitingForAnalysis: "Preparing argument insights…"
-            case let .ready(eventCount): "Ready · \(eventCount) insights"
+            case .submitting: "Sending video…"
+            case .processing: "Analyzing discussion…"
+            case let .ready(eventCount, cached):
+                cached ? "Ready from saved analysis · \(eventCount) insights" : "Ready · \(eventCount) insights"
             case .invalidURL: "Enter a valid YouTube video link"
             case .browserDisconnected: "Waiting for YouTube playback…"
+            case let .noTranscript(message, _): message
+            case .offline: "Can’t reach the analyzer"
+            case let .backend(message, _): message
+            case .updateRequired: "Update the app and try again"
+            }
+        }
+
+        var isLoading: Bool {
+            self == .submitting || self == .processing
+        }
+
+        var canRetry: Bool {
+            switch self {
+            case .offline: true
+            case let .noTranscript(_, retryable), let .backend(_, retryable): retryable
+            default: false
             }
         }
     }
@@ -93,31 +117,51 @@ final class DiscussionSessionModel: ObservableObject {
     @Published private(set) var activeInsight: DiscussionInsight?
     @Published private(set) var status: Status = .empty
 
-    init() {}
+    private let coordinator: DiscussionAnalysisCoordinator
+    private var observations = Set<AnyCancellable>()
 
-    func submit() {
-        guard let videoId = Self.videoId(from: youtubeURL) else {
-            status = .invalidURL
-            return
-        }
-
-        selectedVideoId = videoId
-        playback = DiscussionPlaybackSnapshot(videoId: videoId)
-        activeInsight = nil
-        status = .waitingForAnalysis
+    init(coordinator: DiscussionAnalysisCoordinator? = nil) {
+        self.coordinator = coordinator ?? Self.makeCoordinator()
+        self.coordinator.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in self?.apply(state) }
+            .store(in: &observations)
     }
 
-    func analysisReady(eventCount: Int) {
-        status = .ready(eventCount: eventCount)
+    func submit() {
+        activeInsight = nil
+        coordinator.submit(youtubeURL)
+    }
+
+    func cancelSubmission() {
+        coordinator.cancel()
+    }
+
+    func retry() {
+        coordinator.retry()
+    }
+
+    func refresh() {
+        coordinator.refresh()
     }
 
     /// W3-T2 calls this with browser-owned time. The progress bar is deliberately
     /// read-only, so the app never seeks or advances YouTube itself.
     func receivePlayback(_ snapshot: DiscussionPlaybackSnapshot) {
-        guard selectedVideoId != nil, snapshot.videoId == selectedVideoId else { return }
         playback = snapshot
-        if case .waitingForAnalysis = status { return }
-        if case .empty = status { status = .browserDisconnected }
+        guard let videoId = snapshot.videoId else { return }
+        let update = DiscussionPlaybackState(
+            videoId: videoId,
+            currentTime: snapshot.currentTime,
+            duration: snapshot.duration,
+            paused: snapshot.paused,
+            playbackRate: snapshot.playbackRate,
+            observedAt: Date()
+        )
+        for event in coordinator.receive(update) {
+            guard let insight = Self.insight(from: event) else { continue }
+            present(insight)
+        }
     }
 
     /// The timeline coordinator presents only the event that won arbitration.
@@ -133,33 +177,69 @@ final class DiscussionSessionModel: ObservableObject {
         status = .browserDisconnected
     }
 
-    private static func videoId(from text: String) -> String? {
-        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let host = url.host?.lowercased()
-        else { return nil }
-
-        let candidate: String?
-        if host == "youtu.be" || host == "www.youtu.be" {
-            candidate = url.pathComponents.dropFirst().first
-        } else if host == "youtube.com" || host == "www.youtube.com" || host == "m.youtube.com" {
-            if url.path == "/watch" {
-                candidate = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                    .queryItems?.first(where: { $0.name == "v" })?.value
-            } else if url.pathComponents.count > 2,
-                      ["shorts", "embed", "live"].contains(url.pathComponents[1]) {
-                candidate = url.pathComponents[2]
-            } else {
-                candidate = nil
+    private func apply(_ state: DiscussionAnalysisLoadingState) {
+        switch state {
+        case .empty:
+            status = .empty
+        case .submitting:
+            status = .submitting
+        case .processing:
+            status = .processing
+        case let .ready(videoId, eventCount, source):
+            selectedVideoId = videoId
+            activeInsight = nil
+            status = .ready(eventCount: eventCount, cached: source == .cache)
+        case let .failure(failure):
+            switch failure {
+            case .invalidURL: status = .invalidURL
+            case let .noTranscript(message, retryable):
+                status = .noTranscript(message: message, retryable: retryable)
+            case .offline: status = .offline
+            case let .backend(message, retryable):
+                status = .backend(message: message, retryable: retryable)
+            case .invalidResponse:
+                status = .backend(message: "Analysis response was invalid", retryable: true)
+            case .updateRequired: status = .updateRequired
             }
-        } else {
-            candidate = nil
         }
-
-        guard let candidate,
-              candidate.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil
-        else { return nil }
-        return candidate
     }
+
+    private static func makeCoordinator() -> DiscussionAnalysisCoordinator {
+        let configured = ProcessInfo.processInfo.environment["DISCUSSION_API_BASE_URL"]
+        let baseURL = URL(string: configured ?? "http://127.0.0.1:8787")!
+        let storage: any DiscussionCacheStorage
+        if let directory = try? FileDiscussionCacheStorage.defaultDirectory(),
+           let files = try? FileDiscussionCacheStorage(directory: directory) {
+            storage = files
+        } else {
+            storage = EphemeralDiscussionCacheStorage()
+        }
+        return DiscussionAnalysisCoordinator(
+            api: URLSessionDiscussionAnalysisAPI(baseURL: baseURL),
+            cache: DiscussionTimelineCache(storage: storage)
+        )
+    }
+
+    private static func insight(from event: DiscussionEvent) -> DiscussionInsight? {
+        guard let kind = DiscussionInsight.Kind(rawValue: event.type) else { return nil }
+        return DiscussionInsight(
+            id: event.id,
+            triggerTime: event.triggerTime,
+            kind: kind,
+            title: event.title,
+            summary: event.summary,
+            speaker: event.speaker ?? "Unknown speaker",
+            confidence: event.confidence
+        )
+    }
+}
+
+private actor EphemeralDiscussionCacheStorage: DiscussionCacheStorage {
+    private var values: [String: Data] = [:]
+    func read(key: String) async throws -> Data? { values[key] }
+    func write(_ data: Data, key: String) async throws { values[key] = data }
+    func remove(key: String) async throws { values[key] = nil }
+    func keys() async throws -> [String] { Array(values.keys) }
 }
 
 struct NotchHomeView: View {
@@ -175,11 +255,17 @@ struct NotchHomeView: View {
                 DiscussionInsightCard(insight: insight, onDismiss: model.dismissInsight)
                     .transition(.move(edge: .top).combined(with: .opacity))
             } else {
-                Text(model.status.message)
-                    .font(.caption)
-                    .foregroundStyle(model.status == .invalidURL ? Color.red : Color.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 4)
+                HStack(alignment: .top, spacing: 7) {
+                    if model.status.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(model.status.message)
+                        .font(.caption)
+                        .foregroundStyle(model.status == .invalidURL ? Color.red : Color.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.horizontal, 4)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: model.activeInsight?.id)
@@ -194,18 +280,33 @@ struct NotchHomeView: View {
                 .textFieldStyle(.plain)
                 .focused($linkFocused)
                 .onSubmit(model.submit)
+                .disabled(model.status.isLoading)
                 .accessibilityLabel("YouTube discussion link")
 
-            Button(action: model.submit) {
-                Image(systemName: "arrow.right")
+            Button(action: model.status.isLoading ? model.cancelSubmission : model.submit) {
+                Image(systemName: model.status.isLoading ? "xmark" : "arrow.right")
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 24, height: 24)
                     .background(.white, in: Circle())
                     .foregroundStyle(.black)
             }
             .buttonStyle(.plain)
-            .help("Analyze this YouTube discussion")
-            .accessibilityLabel("Analyze discussion")
+            .help(model.status.isLoading ? "Cancel analysis" : "Analyze this YouTube discussion")
+            .accessibilityLabel(model.status.isLoading ? "Cancel analysis" : "Analyze discussion")
+
+            if model.status.canRetry {
+                Button("Retry", action: model.retry)
+                    .buttonStyle(.plain)
+                    .font(.caption.weight(.semibold))
+                    .accessibilityLabel("Retry analysis")
+            } else if case .ready = model.status {
+                Button(action: model.refresh) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
+                .help("Refresh analysis")
+                .accessibilityLabel("Refresh analysis")
+            }
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
@@ -346,8 +447,6 @@ private struct DiscussionInsightCard: View {
 #Preview("Discussion insight") {
     let model = DiscussionSessionModel()
     model.youtubeURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    model.submit()
-    model.analysisReady(eventCount: 5)
     model.receivePlayback(
         DiscussionPlaybackSnapshot(
             videoId: "dQw4w9WgXcQ",
