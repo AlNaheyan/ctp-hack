@@ -2,7 +2,7 @@
 
 Manifest V3 extension that observes YouTube playback and forwards it toward the
 macOS app. W2-T3 provides the production playback observer and mock transport;
-**W3-T2** replaces that transport with native messaging.
+W3-T2 uses Chrome native messaging in the service worker.
 
 Full runbook: [docs/setup/local-stack.md](../docs/setup/local-stack.md).
 
@@ -10,7 +10,9 @@ Full runbook: [docs/setup/local-stack.md](../docs/setup/local-stack.md).
 
 1. `chrome://extensions` -> enable **Developer mode**.
 2. **Load unpacked** -> select this `extension/` directory.
-3. Open a YouTube watch page, then click **service worker** on the extension
+3. Register the native host using the steps in
+   [native-host/README.md](../native-host/README.md).
+4. Open a YouTube watch page, then click **service worker** on the extension
    card to watch `[boring-notch] playback` messages as you play and pause.
 
 No production key, no store listing, and no native host are required. After
@@ -26,7 +28,8 @@ extension/
     content/youtube-observer.js   classic script: finds the player, reports state
     background/service-worker.js  ES module: validates and forwards
     shared/messages.js            playback envelope + structural validation
-    transport/mock-transport.js   replaceable transport boundary
+    transport/mock-transport.js   component-test transport
+    transport/native-transport.js Chrome native messaging + reconnect
   test/                           node --test suites (no Chrome required)
 ```
 
@@ -52,9 +55,8 @@ listener from the old element.
 
 ## Transport interface
 
-Everything downstream of the service worker goes through one object. W2-T3 keeps
-the mock for component tests; W3-T2 implements the same interface over native
-messaging so nothing else changes.
+Everything downstream of the service worker goes through one object. Tests keep
+the mock; production uses the same interface over native messaging.
 
 ```js
 {
@@ -80,10 +82,10 @@ fails if:
   unpacked on any machine),
 - a credential-shaped string appears in any file.
 
-`nativeMessaging` is deliberately **not** requested yet. It lands with W3-T2
-alongside the host manifest and the reversible registration script - see the
-native-host section of the
-[local stack runbook](../docs/setup/local-stack.md#planned-native-host-registration-w3-t2-not-implemented).
+`nativeMessaging` is required only for the host connection. `storage` holds the
+visible session-scoped connection state; it stores no playback history or
+transcript. Host registration and removal are documented in
+[native-host/README.md](../native-host/README.md).
 
 ## DevTools verification checklist
 

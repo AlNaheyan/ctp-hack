@@ -180,24 +180,20 @@ Wave 1 permissions are deliberately minimal: `https://www.youtube.com/*` host
 access and nothing else. `npm run lint` fails if that widens or if a `key` field
 appears in the manifest.
 
-### Planned native-host registration (W3-T2, not implemented)
+### Native-host registration (W3-T2)
 
-Native messaging is not part of Wave 1 and the `nativeMessaging` permission is
-intentionally absent. The expected shape, for planning only:
+Load the extension unpacked, copy its ID from `chrome://extensions`, then run:
 
-- Proposed host name: `com.theboringteam.boringnotch.bridge`.
-- Chrome reads host manifests from
-  `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/<host>.json`
-  on macOS (per-user; the system-wide path under `/Library` is not used here).
-- The manifest names the host binary path and an
-  `allowed_origins: ["chrome-extension://<EXTENSION_ID>/"]` allowlist, so the
-  extension id must be pinned before registration.
-- W3-T2 ships reversible `register`/`unregister` scripts that generate the
-  manifest at install time. **No developer-specific absolute path may be
-  committed** - the script computes it.
-- Until then, the service worker talks to the mock transport in
-  `extension/src/transport/mock-transport.js`, which W3-T2 replaces behind the
-  same interface.
+```bash
+npm run native:register -- <extension-id>
+# later, to remove it:
+npm run native:unregister
+```
+
+The first command builds the Swift host and generates Chrome's per-user manifest
+with the computed executable path and exactly one allowed extension origin. See
+[native-host/README.md](../../native-host/README.md) for framing, restart, state,
+and troubleshooting details. No loopback server or network port is used.
 
 ## Secrets
 
