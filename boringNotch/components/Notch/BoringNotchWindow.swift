@@ -27,6 +27,8 @@ class BoringNotchWindow: NSPanel {
         titlebarAppearsTransparent = true
         backgroundColor = .clear
         isMovable = false
+        becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         
         collectionBehavior = [
             .fullScreenAuxiliary,
@@ -41,10 +43,17 @@ class BoringNotchWindow: NSPanel {
     }
     
     override var canBecomeKey: Bool {
-        false
+        true
     }
     
     override var canBecomeMain: Bool {
         false
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, !isKeyWindow {
+            makeKey()
+        }
+        super.sendEvent(event)
     }
 }

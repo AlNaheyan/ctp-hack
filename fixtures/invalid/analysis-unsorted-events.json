@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "videoId": "demoTalk001",
+  "title": "Invalid unsorted analysis",
+  "generatedAt": "2026-08-27T16:00:00Z",
+  "expiresAt": "2026-08-28T16:00:00Z",
+  "events": [
+    {
+      "id": "evt_later",
+      "startTime": 20,
+      "triggerTime": 25,
+      "endTime": 30,
+      "speaker": "Speaker A",
+      "type": "evasion",
+      "title": "Later event",
+      "summary": "This valid event is incorrectly placed first.",
+      "confidence": 0.8,
+      "evidence": "Later evidence."
+    },
+    {
+      "id": "evt_earlier",
+      "startTime": 10,
+      "triggerTime": 15,
+      "endTime": 18,
+      "speaker": "Speaker B",
+      "type": "missing_premise",
+      "title": "Earlier event",
+      "summary": "This valid event is incorrectly placed second.",
+      "confidence": 0.7,
+      "evidence": "Earlier evidence."
+    }
+  ]
+}

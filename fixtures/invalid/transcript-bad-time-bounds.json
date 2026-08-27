@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "videoId": "demoTalk001",
+  "language": "en-US",
+  "captionSource": "automatic",
+  "fetchedAt": "2026-08-27T15:58:00Z",
+  "segments": [
+    {
+      "id": "seg_bad_bounds",
+      "startTime": 14.5,
+      "endTime": 11.2,
+      "text": "This segment ends before it starts."
+    }
+  ]
+}

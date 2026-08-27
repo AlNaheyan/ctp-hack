@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "videoId": "demoTalk001",
+  "title": "Invalid time bounds",
+  "generatedAt": "2026-08-27T16:00:00Z",
+  "expiresAt": "2026-08-28T16:00:00Z",
+  "events": [
+    {
+      "id": "evt_bad_bounds",
+      "startTime": 25,
+      "triggerTime": 20,
+      "endTime": 30,
+      "speaker": "Speaker A",
+      "type": "strawman",
+      "title": "Trigger precedes context",
+      "summary": "The trigger time is earlier than the start time.",
+      "confidence": 0.75,
+      "evidence": "Otherwise valid evidence."
+    }
+  ]
+}

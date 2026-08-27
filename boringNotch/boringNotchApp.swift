@@ -9,39 +9,22 @@ import AVFoundation
 import Combine
 import Defaults
 import KeyboardShortcuts
-import Sparkle
 import SwiftUI
 
 @main
 struct DynamicNotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Default(.menubarIcon) var showMenuBarIcon
-    @Environment(\.openWindow) var openWindow
-
-    let updaterController: SPUStandardUpdaterController
-
-    init() {
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-
-        // Initialize the settings window controller with the updater controller
-        SettingsWindowController.shared.setUpdaterController(updaterController)
-    }
 
     var body: some Scene {
-        MenuBarExtra("boring.notch", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
-            Button("Settings") {
-                DispatchQueue.main.async {
-                    SettingsWindowController.shared.showWindow()
+        MenuBarExtra("Discussion Notch", systemImage: "bubble.left.and.text.bubble.right", isInserted: $showMenuBarIcon) {
+            Button("Open Discussion Notch") {
+                Task { @MainActor in
+                    appDelegate.vm.open()
                 }
             }
-            .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
-            CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Boring Notch") {
-                ApplicationRelauncher.restart()
-            }
-            Button("Quit", role: .destructive) {
+            Button("Quit Discussion Notch", role: .destructive) {
                 NSApplication.shared.terminate(self)
             }
             .keyboardShortcut(KeyEquivalent("Q"), modifiers: .command)
@@ -82,7 +65,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DistributedNotificationCenter.default().removeObserver(observer)
             screenUnlockedObserver = nil
         }
-        MusicManager.shared.destroy()
         cleanupDragDetectors()
         cleanupWindows()
         XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
@@ -351,20 +333,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
-        KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
-            guard let self = self else { return }
-            if Defaults[.sneakPeekStyles] == .inline {
-                let newStatus = !self.coordinator.expandingView.show
-                self.coordinator.toggleExpandingView(status: newStatus, type: .music)
-            } else {
-                self.coordinator.toggleSneakPeek(
-                    status: !self.coordinator.sneakPeek.show,
-                    type: .music,
-                    duration: 3.0
-                )
-            }
-        }
-
         KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
             Task { [weak self] in
                 guard let self = self else { return }
@@ -420,20 +388,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             adjustWindowPosition(changeAlpha: true)
         }
 
-        setupDragDetectors()
-
-        if coordinator.firstLaunch {
-            DispatchQueue.main.async {
-                self.showOnboardingWindow()
-            }
-            playWelcomeSound()
-        } else if MusicManager.shared.isNowPlayingDeprecated
-            && Defaults[.mediaController] == .nowPlaying
-        {
-            DispatchQueue.main.async {
-                self.showOnboardingWindow(step: .musicPermission)
-            }
-        }
+        // The discussion app needs no media, camera, calendar, shelf, or HUD
+        // onboarding. Opening the notch is the complete first-run experience.
+        coordinator.firstLaunch = false
 
         previousScreens = NSScreen.screens
     }

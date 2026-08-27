@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "error": {
+    "code": "CAPTIONS_DISABLED",
+    "message": "Captions are not available for this video.",
+    "retryable": false,
+    "requestId": "req_demo_001",
+    "details": {
+      "videoId": "demoTalk001"
+    }
+  }
+}
