@@ -1,8 +1,8 @@
 # Chrome Extension
 
-Manifest V3 skeleton that observes YouTube playback and forwards it to the
-macOS app. Wave 1 proves it loads unpacked and produces one schema-valid
-message; **W2-T3** owns the real observer and **W3-T2** owns native messaging.
+Manifest V3 extension that observes YouTube playback and forwards it toward the
+macOS app. W2-T3 provides the production playback observer and mock transport;
+**W3-T2** replaces that transport with native messaging.
 
 Full runbook: [docs/setup/local-stack.md](../docs/setup/local-stack.md).
 
@@ -35,13 +35,20 @@ extension/
 ```text
 <video> events -> content script -> chrome.runtime.sendMessage
    { type: "PLAYBACK_OBSERVATION", payload: { videoId, currentTime, duration, paused, playbackRate } }
-      -> service worker -> createPlaybackMessage() -> validatePlaybackMessage()
+      -> service worker -> ordered playback forwarder
+         -> createPlaybackMessage() -> validatePlaybackMessage()
          -> transport.send({ schemaVersion, type: "PLAYBACK_STATE", payload })
 ```
 
 The content script sends raw observations and the service worker builds the
 versioned envelope, so the wire contract lives in exactly one place
 (`src/shared/messages.js`).
+
+The content script emits immediately when it is injected, when the active video
+or YouTube SPA route changes, and on `play`, `pause`, `seeked`, `ratechange`, and
+`loadedmetadata`. While playing it emits every 250 ms. Pausing removes that
+timer. A mutation observer reacquires a replaced player and detaches every
+listener from the old element.
 
 ## Transport interface
 
@@ -78,9 +85,23 @@ alongside the host manifest and the reversible registration script - see the
 native-host section of the
 [local stack runbook](../docs/setup/local-stack.md#planned-native-host-registration-w3-t2-not-implemented).
 
-## Not implemented here (on purpose)
+## DevTools verification checklist
 
-SPA navigation re-acquisition, the 250 ms playing cadence, seek and rate
-handling, listener teardown on detached videos, and service-worker suspension
-recovery are all W2-T3. The stub only listens for `loadedmetadata`, `play`, and
-`pause` so there is something to verify today.
+After loading `extension/` unpacked:
+
+- [ ] Open a YouTube watch page and confirm an `injected` observation is logged
+  in the extension service-worker console.
+- [ ] Play the video and confirm timestamps advance about four times per second.
+- [ ] Pause and confirm one immediate `pause` observation arrives, followed by
+  no periodic observations.
+- [ ] Seek and change playback rate; confirm immediate `seeked` and `ratechange`
+  observations with the new values.
+- [ ] Navigate to another video using YouTube links without reloading the tab;
+  confirm one `videochange` observation has the new 11-character ID.
+- [ ] Let the MV3 worker become inactive (or stop it from `chrome://extensions`),
+  then resume playback and confirm the next observation wakes it and reconnects
+  the mock transport.
+- [ ] Navigate to a feed page and confirm preview videos do not produce messages.
+
+Automated coverage for the same lifecycle lives in
+`test/content-script.test.js` and `test/playback-forwarder.test.js`.

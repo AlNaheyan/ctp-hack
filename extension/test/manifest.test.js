@@ -25,7 +25,7 @@ test('every file the manifest references exists', () => {
   }
 });
 
-test('permissions stay minimal for Wave 1', () => {
+test('permissions stay minimal for the playback observer', () => {
   assert.deepEqual(manifest.host_permissions, ['https://www.youtube.com/*']);
   assert.equal(manifest.permissions ?? undefined, undefined, 'no extra permissions until a ticket needs them');
   assert.equal((manifest.permissions ?? []).includes('nativeMessaging'), false, 'native messaging arrives in W3-T2');

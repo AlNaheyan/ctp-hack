@@ -238,4 +238,5 @@ cannot automate:
   run W1-T2's canonical validator.
 - **Known limitations:** the mock has no real cache or request coalescing;
   `forceRefresh` only flips the `x-analysis-cache` header. `ANALYSIS_MODE=live`
-  is a stub. Extension observation is a proof of life, not the W2-T3 observer.
+  remains in-memory. The W2-T3 observer is production-ready, but native delivery
+  to the macOS app remains deferred to W3-T2.

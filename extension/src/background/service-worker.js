@@ -1,38 +1,25 @@
-// Service worker skeleton.
-//
-// Scope in Wave 1: prove the extension loads unpacked, receives content-script
-// observations, and forwards them through a replaceable transport. W2-T3 owns
-// the real observer semantics (250 ms cadence, SPA navigation, suspension
-// recovery); W3-T2 swaps the mock transport for native messaging.
+// MV3 service worker. Chrome wakes it for each content-script message; a fresh
+// worker reconnects the replaceable transport before forwarding its first item.
 
-import { createPlaybackMessage, validatePlaybackMessage } from '../shared/messages.js';
+import { createPlaybackForwarder } from './playback-forwarder.js';
 import { createMockTransport } from '../transport/mock-transport.js';
 
 const transport = createMockTransport();
+const forwarder = createPlaybackForwarder({ transport });
 
 transport.onStatusChange((status) => {
   console.debug('[boring-notch] transport status', status);
 });
 
-async function forward(observation) {
-  const message = createPlaybackMessage(observation);
-  const { valid, errors } = validatePlaybackMessage(message);
-
-  if (!valid) {
-    console.warn('[boring-notch] dropping invalid playback message', errors);
-    return { ok: false, errors };
-  }
-
-  if (transport.status !== 'connected') await transport.connect();
-  await transport.send(message);
-  return { ok: true };
-}
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'PLAYBACK_OBSERVATION') return undefined;
 
-  forward(message.payload)
-    .then(sendResponse)
+  forwarder
+    .forward(message.payload)
+    .then((result) => {
+      if (!result.ok) console.warn('[boring-notch] dropping invalid playback message', result.errors);
+      sendResponse(result);
+    })
     .catch((error) => sendResponse({ ok: false, errors: [String(error)] }));
 
   // Keep the message channel open for the async response.
