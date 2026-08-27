@@ -39,6 +39,19 @@
     return document.querySelector('video.html5-main-video, video');
   }
 
+  function disposeInvalidatedContext() {
+    const controller = globalThis[CONTROLLER_KEY];
+    if (controller?.dispose) {
+      controller.dispose();
+      return;
+    }
+
+    // This can only happen during initial injection, before the controller has
+    // been published. Prevent any later observer work from being scheduled.
+    disposed = true;
+    stopCadence();
+  }
+
   function observe() {
     const videoId = currentVideoId();
     if (!activeVideo || videoId === null || activeVideo.isConnected === false) return null;
@@ -60,14 +73,33 @@
   }
 
   function deliver(message, attempt = 0) {
-    chrome.runtime.sendMessage(message, () => {
-      const failed = Boolean(chrome.runtime.lastError);
-      if (failed && attempt === 0 && !disposed) {
-        // sendMessage wakes an MV3 worker. One bounded retry covers the short
-        // startup/reload window without creating a permanent polling loop.
-        setTimeout(() => deliver(message, 1), PLAYING_INTERVAL_MS);
-      }
-    });
+    // Reloading an unpacked extension invalidates content scripts already in
+    // open tabs. They cannot reconnect; only a page refresh injects the new
+    // context, so stop this stale observer without polluting extension errors.
+    if (!chrome.runtime?.id) {
+      disposeInvalidatedContext();
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(message, () => {
+        let failed;
+        try {
+          failed = Boolean(chrome.runtime.lastError);
+        } catch {
+          disposeInvalidatedContext();
+          return;
+        }
+
+        if (failed && attempt === 0 && !disposed) {
+          // sendMessage wakes an MV3 worker. One bounded retry covers the short
+          // startup/reload window without creating a permanent polling loop.
+          setTimeout(() => deliver(message, 1), PLAYING_INTERVAL_MS);
+        }
+      });
+    } catch {
+      disposeInvalidatedContext();
+    }
   }
 
   function report(reason) {
