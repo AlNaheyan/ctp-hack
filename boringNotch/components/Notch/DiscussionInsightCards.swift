@@ -337,16 +337,255 @@ struct ExpandedDiscussionInsightCard: View {
         // Metadata, action row, card padding, and VStack spacing are fixed.
         return ceil(68 + titleHeight + summaryHeight + evidenceHeight)
     }
+}
 
-    private func measuredHeight(_ text: String, font: NSFont, width: CGFloat) -> CGFloat {
-        guard !text.isEmpty else { return 0 }
-        return ceil(
-            (text as NSString).boundingRect(
-                with: CGSize(width: width, height: .greatestFiniteMagnitude),
-                options: [.usesLineFragmentOrigin, .usesFontLeading],
-                attributes: [.font: font]
-            ).height
+private func measuredHeight(_ text: String, font: NSFont, width: CGFloat) -> CGFloat {
+    guard !text.isEmpty else { return 0 }
+    return ceil(
+        (text as NSString).boundingRect(
+            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        ).height
+    )
+}
+
+// MARK: - Insight rail (direction 1b)
+
+/// The read-only playback bar as the spine of the analysis: every analyzed
+/// moment is a tick colored by insight type, the active one a lifted pill at
+/// the playhead. Display-only — it must never become a scrubber.
+struct DiscussionInsightRailView: View {
+    let events: [DiscussionEvent]
+    let activeEventID: String?
+    let currentTime: Double
+    let duration: Double
+
+    private struct Tick: Identifiable {
+        let id: String
+        let position: Double
+        let accent: Color
+        let isPassed: Bool
+        let isActive: Bool
+        let tooltip: String
+    }
+
+    private var progress: Double {
+        guard duration > 0 else { return 0 }
+        return min(max(currentTime / duration, 0), 1)
+    }
+
+    /// Ticks are positioned by `triggerTime / duration`. With no matching
+    /// playback yet, the last analyzed moment spans the track so the shape of
+    /// the discussion is still visible.
+    private var ticks: [Tick] {
+        let total = duration > 0 ? duration : (events.map(\.endTime).max() ?? 0)
+        guard total > 0 else { return [] }
+
+        var result: [Tick] = []
+        for event in events {
+            let style = DiscussionInsightStyle(type: event.type, confidence: event.confidence)
+            let tick = Tick(
+                id: event.id,
+                position: min(max(event.triggerTime / total, 0), 1),
+                accent: style.accent,
+                isPassed: event.triggerTime <= currentTime,
+                isActive: event.id == activeEventID,
+                tooltip: "\(style.label) · \(event.title) · \(discussionTime(event.triggerTime))"
+            )
+            // Overlapping ticks (< 1% apart) merge into the earlier one; the
+            // active pill always draws.
+            if !tick.isActive, let last = result.last, !last.isActive,
+               tick.position - last.position < 0.01 {
+                continue
+            }
+            result.append(tick)
+        }
+        return result
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            ZStack(alignment: .topLeading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(width: width, height: 4)
+                    .offset(y: 9)
+
+                Capsule()
+                    .fill(Color.white.opacity(0.5))
+                    .frame(width: width * progress, height: 4)
+                    .offset(y: 9)
+
+                ForEach(ticks) { tick in
+                    railTick(tick, railWidth: width)
+                }
+            }
+        }
+        .frame(height: 22)
+        // Passed/ahead counts and the card carry this information for
+        // assistive tech; the rail itself is a visual summary.
+        .accessibilityHidden(true)
+        .help("Analyzed moments · read-only")
+    }
+
+    @ViewBuilder
+    private func railTick(_ tick: Tick, railWidth: CGFloat) -> some View {
+        let center = railWidth * tick.position
+        if tick.isActive {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(tick.accent)
+                .frame(width: 12, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(tick.accent.opacity(0.22))
+                        .frame(width: 18, height: 28)
+                )
+                .offset(x: min(max(center - 6, 0), railWidth - 12))
+                .help(tick.tooltip)
+        } else {
+            Capsule()
+                .fill(tick.isPassed ? tick.accent.opacity(0.4) : Color.white.opacity(0.22))
+                .frame(width: 2, height: tick.isPassed ? 12 : 10)
+                .offset(x: min(max(center - 1, 0), railWidth - 2), y: tick.isPassed ? 5 : 6)
+                .help(tick.tooltip)
+        }
+    }
+}
+
+/// The 1b insight card: accent spine on the leading edge instead of a stroke,
+/// one demoted metadata line, and trailing `Open m:ss` + dismiss chips.
+struct RailDiscussionInsightCard: View {
+    let event: DiscussionEvent
+    let onOpen: () -> Void
+    let onDismiss: () -> Void
+    let onHover: (Bool) -> Void
+    var onPreferredHeightChange: (CGFloat) -> Void = { _ in }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var style: DiscussionInsightStyle { .init(type: event.type, confidence: event.confidence) }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            style.accent.frame(width: 3)
+
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: style.symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(style.accent)
+                    .padding(.top, 1)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    metadata
+
+                    Text(event.title)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(event.title)
+
+                    Text(event.summary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(event.summary)
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(discussionTime(event.triggerTime))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 6) {
+                        Button("Open \(discussionTime(event.startTime))", action: onOpen)
+                            .buttonStyle(.plain)
+                            .font(.caption2.weight(.medium))
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 8)
+                            .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                            .help("Open on YouTube at \(discussionTime(event.startTime))")
+
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .frame(width: 20, height: 20)
+                        }
+                        .buttonStyle(.plain)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityLabel("Dismiss insight")
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .padding(.vertical, 9)
+            .padding(.horizontal, 11)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(style.accent.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
+        .onHover(perform: onHover)
+        .onAppear { onPreferredHeightChange(preferredCardHeight) }
+        .onChange(of: event.id) { _, _ in onPreferredHeightChange(preferredCardHeight) }
+        .onExitCommand(perform: onDismiss)
+        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(
+            "Discussion insight, \(style.label), \(event.title), at \(discussionTime(event.triggerTime))"
         )
+        .accessibilityValue(
+            [event.summary, event.speaker, style.confidenceLabel].compactMap { $0 }.joined(separator: ", ")
+        )
+    }
+
+    private var metadata: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(style.label.uppercased())
+                .font(.caption2.weight(.bold))
+                .tracking(0.6)
+                .foregroundStyle(style.accent)
+            Text(metadataDetail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var metadataDetail: String {
+        var parts: [String] = []
+        if let speaker = event.speaker, !speaker.isEmpty { parts.append(speaker) }
+        parts.append(style.confidenceLabel.lowercased())
+        if event.confidence < 0.6 { parts.append("review context") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var preferredCardHeight: CGFloat {
+        // Text width at the 640-point notch after the outer inset, spine, card
+        // padding, symbol column, and trailing chip column are removed.
+        let textWidth: CGFloat = 430
+        let titleHeight = min(
+            measuredHeight(
+                event.title,
+                font: .systemFont(ofSize: 12, weight: .semibold),
+                width: textWidth
+            ),
+            32
+        )
+        let summaryHeight = min(
+            measuredHeight(event.summary, font: .systemFont(ofSize: 10), width: textWidth),
+            40
+        )
+        // Metadata row, two 3 pt gaps, and 9 pt vertical padding are fixed.
+        return ceil(37 + titleHeight + summaryHeight)
     }
 }
 
@@ -424,7 +663,7 @@ private struct DiscussionInsightStyle {
     }
 }
 
-private func discussionTime(_ seconds: Double) -> String {
+func discussionTime(_ seconds: Double) -> String {
     let total = max(0, Int(seconds.rounded(.down)))
     let hours = total / 3_600
     let minutes = (total % 3_600) / 60
@@ -469,6 +708,29 @@ private func discussionTime(_ seconds: Double) -> String {
     .preferredColorScheme(.dark)
 }
 
+#Preview("Insight rail") {
+    VStack(spacing: 9) {
+        DiscussionInsightRailView(
+            events: DiscussionEvent.railPreviewEvents,
+            activeEventID: "rail-4",
+            currentTime: 342.8,
+            duration: 1_204
+        )
+        RailDiscussionInsightCard(
+            event: DiscussionEvent.railPreviewEvents[4],
+            onOpen: {},
+            onDismiss: {},
+            onHover: { _ in }
+        )
+        .frame(height: 75)
+    }
+    .padding(.horizontal, 32)
+    .padding(.vertical, 14)
+    .frame(width: 640)
+    .background(.black)
+    .preferredColorScheme(.dark)
+}
+
 #Preview("Recovery states") {
     VStack {
         ForEach(DiscussionRecoveryPreviewState.allCases) { state in
@@ -482,6 +744,38 @@ private func discussionTime(_ seconds: Double) -> String {
 }
 
 private extension DiscussionEvent {
+    /// Eleven analyzed moments spread across a 20:04 video, mirroring the
+    /// handoff's rail fixture; the fifth is active at the 5:42 playhead.
+    static let railPreviewEvents: [DiscussionEvent] = {
+        let moments: [(time: Double, type: String)] = [
+            (72, "unsupported_claim"),
+            (132, "contradiction"),
+            (229, "missing_premise"),
+            (289, "unsupported_claim"),
+            (342.8, "unsupported_claim"),
+            (409, "evasion"),
+            (445, "contradiction"),
+            (626, "strawman"),
+            (758, "missing_premise"),
+            (794, "unsupported_claim"),
+            (975, "evasion"),
+        ]
+        return moments.enumerated().map { index, moment in
+            DiscussionEvent(
+                id: "rail-\(index)",
+                startTime: max(0, moment.time - 4),
+                triggerTime: moment.time,
+                endTime: moment.time + 6,
+                speaker: "Speaker A",
+                type: moment.type,
+                title: "The numerical claim is presented without a source",
+                summary: "A percentage is given with no evidence or time period attached.",
+                confidence: 0.91,
+                evidence: "The rate rose by forty percent."
+            )
+        }
+    }()
+
     static let longPreview = DiscussionEvent(
         id: "preview-long",
         startTime: 3_598,

@@ -69,6 +69,15 @@ final class DiscussionSessionModel: ObservableObject {
     @Published private(set) var selectedVideoId: String?
     @Published private(set) var playback = DiscussionPlaybackSnapshot()
     @Published private(set) var status: Status = .empty
+    @Published private(set) var analysisEvents: [DiscussionEvent] = []
+    @Published private(set) var analysisTitle: String?
+
+    /// The insight-rail layout replaces the link field once an analysis is
+    /// active; every other state keeps the URL-entry surface.
+    var isRailLayoutActive: Bool {
+        if case .ready = status { return !analysisEvents.isEmpty }
+        return false
+    }
 
     private let coordinator: DiscussionAnalysisCoordinator
     private var observations = Set<AnyCancellable>()
@@ -133,6 +142,8 @@ final class DiscussionSessionModel: ObservableObject {
         switch state {
         case .empty:
             status = .empty
+            analysisEvents = []
+            analysisTitle = nil
         case let .submitting(videoId):
             selectedVideoId = videoId
             playback = DiscussionPlaybackSnapshot(videoId: videoId)
@@ -147,6 +158,11 @@ final class DiscussionSessionModel: ObservableObject {
                     analysis.events,
                     videoId: analysis.videoId
                 )
+                analysisEvents = analysis.events
+                analysisTitle = analysis.title
+            } else {
+                analysisEvents = []
+                analysisTitle = nil
             }
             status = .ready(eventCount: eventCount, cached: source == .cache)
         case let .failure(failure):
@@ -223,6 +239,17 @@ struct NotchHomeView: View {
     @FocusState private var linkFocused: Bool
 
     var body: some View {
+        Group {
+            if model.isRailLayoutActive {
+                railLayout
+            } else {
+                classicLayout
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: presentation.activeEvent?.id)
+    }
+
+    private var classicLayout: some View {
         VStack(spacing: 10) {
             linkInput
             PlaybackPositionView(snapshot: model.playback)
@@ -238,20 +265,120 @@ struct NotchHomeView: View {
                 )
                 .id(event.id)
             } else {
-                HStack(alignment: .top, spacing: 7) {
-                    if model.status.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(model.status.message)
-                        .font(.caption)
-                        .foregroundStyle(model.status == .invalidURL ? Color.red : Color.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 4)
+                statusLine
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: presentation.activeEvent?.id)
+    }
+
+    // MARK: Insight rail (direction 1b)
+
+    /// Chrome-reported playback only drives the rail while it describes the
+    /// analyzed video; another video's position must not move the playhead.
+    private var playbackMatchesAnalysis: Bool {
+        model.playback.videoId != nil && model.playback.videoId == model.selectedVideoId
+    }
+
+    private var effectivePlayback: DiscussionPlaybackSnapshot {
+        playbackMatchesAnalysis ? model.playback : DiscussionPlaybackSnapshot()
+    }
+
+    private var railLayout: some View {
+        let snapshot = effectivePlayback
+        return VStack(spacing: 9) {
+            railHeader(snapshot)
+
+            DiscussionInsightRailView(
+                events: model.analysisEvents,
+                activeEventID: presentation.activeEvent?.id,
+                currentTime: snapshot.currentTime,
+                duration: snapshot.duration
+            )
+
+            railCounts(snapshot)
+
+            if let event = presentation.activeEvent {
+                RailDiscussionInsightCard(
+                    event: event,
+                    onOpen: presentation.openActiveEvent,
+                    onDismiss: presentation.dismiss,
+                    onHover: presentation.setHovered,
+                    onPreferredHeightChange: onInsightHeightChange
+                )
+                .id(event.id)
+            } else {
+                statusLine
+            }
+        }
+        .padding(.bottom, 14)
+    }
+
+    private func railHeader(_ snapshot: DiscussionPlaybackSnapshot) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(playbackMatchesAnalysis ? Color.green : Color.white.opacity(0.25))
+                .frame(width: 5, height: 5)
+                .accessibilityLabel(
+                    playbackMatchesAnalysis ? "Connected to YouTube playback" : "Waiting for YouTube playback"
+                )
+
+            Text(model.analysisTitle ?? "YouTube video")
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(model.analysisTitle ?? "YouTube video")
+
+            Text("\(discussionTime(snapshot.currentTime)) / \(discussionTime(snapshot.duration))")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .accessibilityLabel(
+                    "\(discussionTime(snapshot.currentTime)) of \(discussionTime(snapshot.duration))"
+                )
+
+            Button(action: model.refresh) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Refresh analysis")
+            .accessibilityLabel("Refresh analysis")
+        }
+        .frame(height: 16)
+    }
+
+    private func railCounts(_ snapshot: DiscussionPlaybackSnapshot) -> some View {
+        let activeID = presentation.activeEvent?.id
+        let passed = model.analysisEvents
+            .filter { $0.triggerTime <= snapshot.currentTime && $0.id != activeID }
+            .count
+        let ahead = model.analysisEvents
+            .filter { $0.triggerTime > snapshot.currentTime }
+            .count
+        return HStack {
+            Text("\(passed) passed")
+            Spacer()
+            Text("\(ahead) ahead")
+        }
+        .font(.caption2)
+        .tracking(0.4)
+        .foregroundStyle(.secondary)
+        .frame(height: 12)
+    }
+
+    private var statusLine: some View {
+        HStack(alignment: .top, spacing: 7) {
+            if model.status.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Text(model.status.message)
+                .font(.caption)
+                .foregroundStyle(model.status == .invalidURL ? Color.red : Color.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 4)
     }
 
     private var linkInput: some View {

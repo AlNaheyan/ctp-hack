@@ -51,7 +51,7 @@ struct ContentView: View {
                             presentation: presentation,
                             onInsightHeightChange: resizeForInsight
                         )
-                            .padding(.top, 8)
+                            .padding(.top, discussion.isRailLayoutActive ? 6 : 8)
                             .padding(.horizontal, contentHorizontalInset)
                     }
                 } else {
@@ -118,10 +118,13 @@ struct ContentView: View {
 
     private func resizeForInsight(_ cardHeight: CGFloat) {
         guard presentation.activeEvent != nil else { return }
-        // Closed-notch clearance, input, playback bar, and vertical spacing sit
-        // above the card. The visible notch grows downward; the host window has
-        // capacity up to maximumOpenNotchHeight.
-        let chromeHeight = max(24, vm.effectiveClosedNotchHeight) + 86
+        // Everything above and below the card is fixed chrome: closed-notch
+        // clearance plus either the link field + playback bar (classic) or the
+        // header + rail + counts rows and bottom inset (insight rail). The
+        // visible notch grows downward; the host window has capacity up to
+        // maximumOpenNotchHeight.
+        let chromeHeight = max(24, vm.effectiveClosedNotchHeight)
+            + (discussion.isRailLayoutActive ? 97 : 86)
         withAnimation(.easeInOut(duration: 0.2)) {
             vm.resizeOpenNotch(to: chromeHeight + cardHeight)
         }
