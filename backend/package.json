@@ -1,0 +1,17 @@
+{
+  "name": "@boring-notch/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Analysis backend. Wave 1 ships the mock API only; W2-T1/W2-T2/W3-T1 add the real pipeline.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "mock": "node src/mock/server.js",
+    "test": "node --test"
+  }
+}
