@@ -44,7 +44,7 @@ else
   mkdir -p "$SCRIPT_DIR/.build"
   : > "$BACKEND_LOG_PATH"
 
-  echo "Starting the analysis API at $API_BASE_URL…"
+  echo "Starting the analysis API at ${API_BASE_URL}..."
   nohup env PORT="$API_PORT" npm run dev >"$BACKEND_LOG_PATH" 2>&1 &
   backend_pid=$!
 
@@ -69,7 +69,7 @@ else
   echo "Analysis API ready (PID $backend_pid; log: $BACKEND_LOG_PATH)"
 fi
 
-echo "Building boringNotch…"
+echo "Building boringNotch..."
 xcodebuild \
   -quiet \
   -project boringNotch.xcodeproj \
@@ -87,7 +87,7 @@ fi
 
 # Replace only running instances whose executable name exactly matches this app.
 if pgrep -x "$APP_PROCESS" >/dev/null; then
-  echo "Stopping the previous boringNotch instance…"
+  echo "Stopping the previous boringNotch instance..."
   pkill -TERM -x "$APP_PROCESS"
 
   attempts=0
@@ -100,7 +100,7 @@ if pgrep -x "$APP_PROCESS" >/dev/null; then
   done
 
   if pgrep -x "$APP_PROCESS" >/dev/null; then
-    echo "The previous instance did not exit gracefully; force-stopping it…"
+    echo "The previous instance did not exit gracefully; force-stopping it..."
     pkill -KILL -x "$APP_PROCESS"
 
     attempts=0
@@ -127,7 +127,7 @@ open -n "$APP_PATH"
 # every app rebuild.
 mkdir -p "$CHROME_PROFILE_PATH"
 
-echo "Launching Google Chrome with the unpacked discussion extension…"
+echo "Launching Google Chrome with the unpacked discussion extension..."
 "$CHROME_BINARY" \
   --user-data-dir="$CHROME_PROFILE_PATH" \
   --load-extension="$EXTENSION_PATH" \
