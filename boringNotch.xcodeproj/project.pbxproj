@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C7D15C012F60000100000001 /* DiscussionTimeline in Frameworks */ = {isa = PBXBuildFile; productRef = C7D15C032F60000100000001 /* DiscussionTimeline */; };
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
 		110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */; };
 		1100292A2E8691B400035A57 /* FileShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029292E8691B400035A57 /* FileShareView.swift */; };
@@ -338,6 +339,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7D15C012F60000100000001 /* DiscussionTimeline in Frameworks */,
 				111BEA5F2ED07A340079DD4E /* MacroVisionKit in Frameworks */,
 				9A987A102C73CA8D005CA465 /* Collections in Frameworks */,
 				1194E8852EA57D23009C82D6 /* SkyLightWindow in Frameworks */,
@@ -802,6 +804,7 @@
 			);
 			name = boringNotch;
 			packageProductDependencies = (
+				C7D15C032F60000100000001 /* DiscussionTimeline */,
 				14D032192C68F32E0096E6A1 /* LaunchAtLogin */,
 				14D0321C2C68F3350096E6A1 /* Sparkle */,
 				B18654382C6F4990000B926A /* KeyboardShortcuts */,
@@ -848,6 +851,7 @@
 			);
 			mainGroup = 14CEF4092C5CAED200855D72;
 			packageReferences = (
+				C7D15C022F60000100000001 /* XCLocalSwiftPackageReference "DiscussionTimeline" */,
 				14D032182C68F32E0096E6A1 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 				14D0321B2C68F3350096E6A1 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				B18654372C6F4990000B926A /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
@@ -1347,6 +1351,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		C7D15C022F60000100000001 /* XCLocalSwiftPackageReference "DiscussionTimeline" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DiscussionTimeline;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		111BE95B2ECD71E10079DD4E /* XCRemoteSwiftPackageReference "AsyncXPCConnection" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1439,6 +1450,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		C7D15C032F60000100000001 /* DiscussionTimeline */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C7D15C022F60000100000001 /* XCLocalSwiftPackageReference "DiscussionTimeline" */;
+			productName = DiscussionTimeline;
+		};
 		111BE95C2ECD71E10079DD4E /* AsyncXPCConnection */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 111BE95B2ECD71E10079DD4E /* XCRemoteSwiftPackageReference "AsyncXPCConnection" */;
