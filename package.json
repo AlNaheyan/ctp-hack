@@ -13,6 +13,7 @@
     "extension"
   ],
   "scripts": {
+    "api": "node backend/src/index.js",
     "dev": "node scripts/dev.mjs",
     "mock": "node backend/src/mock/server.js",
     "analyze": "node backend/src/analysis/cli.js",

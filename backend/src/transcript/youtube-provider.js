@@ -1,4 +1,8 @@
 import { AppError } from '../errors.js';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const MAX_WATCH_BYTES = 5 * 1024 * 1024;
 const MAX_CAPTION_BYTES = 5 * 1024 * 1024;
@@ -11,10 +15,16 @@ const YOUTUBE_ORIGIN = 'https://www.youtube.com';
  * page is an upstream implementation detail and may change independently.
  */
 export class YouTubeCaptionProvider {
-  constructor({ fetchImpl = globalThis.fetch, origin = YOUTUBE_ORIGIN } = {}) {
+  constructor({
+    fetchImpl = globalThis.fetch,
+    origin = YOUTUBE_ORIGIN,
+    ytDlpFallback = fetchTranscriptWithYtDlp
+  } = {}) {
     if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl must be a function');
+    if (typeof ytDlpFallback !== 'function') throw new TypeError('ytDlpFallback must be a function');
     this.fetchImpl = fetchImpl;
     this.origin = origin;
+    this.ytDlpFallback = ytDlpFallback;
   }
 
   /**
@@ -54,26 +64,19 @@ export class YouTubeCaptionProvider {
 
     const track = selectCaptionTrack(tracks, { language, captionSource });
     const trackUrl = validateTrackUrl(track.baseUrl);
-    trackUrl.searchParams.set('fmt', 'json3');
+    const jsonUrl = new URL(trackUrl);
+    jsonUrl.searchParams.set('fmt', 'json3');
+    const jsonSource = await fetchCaptionSource(this.fetchImpl, jsonUrl, signal);
+    let cues = parseJson3(jsonSource);
 
-    const captionResponse = await this.fetchImpl(trackUrl, {
-      signal,
-      headers: {
-        accept: 'application/json,text/plain;q=0.8',
-        'user-agent': 'BoringNotchDiscussionAnalyzer/0.1'
-      }
-    });
-    if (!captionResponse.ok) {
-      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube did not return the selected caption track.', {
-        retryable: captionResponse.status >= 500 || captionResponse.status === 429
-      });
+    // Some public tracks advertise a valid URL but return an empty or non-JSON
+    // body when JSON3 is requested. Retry YouTube's native timed-text format.
+    if (cues === null) {
+      const timedTextSource = await fetchCaptionSource(this.fetchImpl, trackUrl, signal);
+      cues = parseTimedText(timedTextSource);
     }
 
-    const source = await readBoundedText(captionResponse, MAX_CAPTION_BYTES, 'caption track');
-    let payload;
-    try {
-      payload = JSON.parse(source);
-    } catch {
+    if (cues === null) {
       throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube returned an unreadable caption track.', {
         retryable: true
       });
@@ -83,9 +86,95 @@ export class YouTubeCaptionProvider {
       videoId,
       language: track.languageCode,
       captionSource: sourceForTrack(track),
-      cues: json3Cues(payload)
+      cues
     };
   }
+}
+
+/** Retrieve JSON3 captions through the locally installed yt-dlp executable. */
+export async function fetchTranscriptWithYtDlp({
+  videoId,
+  language,
+  captionSource,
+  signal,
+  spawnImpl = spawn
+}) {
+  const workingDirectory = await mkdtemp(join(tmpdir(), 'boring-notch-captions-'));
+  try {
+    const outputTemplate = join(workingDirectory, '%(id)s.%(ext)s');
+    const captionFlag = captionSource === 'automatic' ? '--write-auto-subs' : '--write-subs';
+    await runYtDlp([
+      '--no-update',
+      '--skip-download',
+      captionFlag,
+      '--sub-langs', language,
+      '--sub-format', 'json3',
+      '--no-playlist',
+      '--output', outputTemplate,
+      `https://www.youtube.com/watch?v=${videoId}`
+    ], { signal, spawnImpl });
+
+    const captionFiles = (await readdir(workingDirectory))
+      .filter((name) => name.endsWith('.json3'))
+      .sort();
+    if (captionFiles.length === 0) {
+      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp did not return the selected caption track.', {
+        retryable: true
+      });
+    }
+
+    const captionPath = join(workingDirectory, captionFiles[0]);
+    const metadata = await stat(captionPath);
+    if (metadata.size > MAX_CAPTION_BYTES) {
+      throw new AppError(
+        'TRANSCRIPT_UNAVAILABLE',
+        `YouTube caption track exceeds the ${MAX_CAPTION_BYTES}-byte limit.`
+      );
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(await readFile(captionPath, 'utf8'));
+    } catch {
+      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp returned an unreadable caption track.', {
+        retryable: true
+      });
+    }
+
+    return {
+      videoId,
+      language,
+      captionSource,
+      cues: json3Cues(payload)
+    };
+  } finally {
+    await rm(workingDirectory, { recursive: true, force: true });
+  }
+}
+
+function runYtDlp(arguments_, { signal, spawnImpl }) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnImpl('yt-dlp', arguments_, {
+        signal,
+        stdio: ['ignore', 'ignore', 'ignore']
+      });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve();
+      else {
+        reject(new AppError('TRANSCRIPT_UNAVAILABLE', 'yt-dlp could not retrieve captions from YouTube.', {
+          retryable: true
+        }));
+      }
+    });
+  });
 }
 
 /** Parse the balanced ytInitialPlayerResponse object from a watch page. */
@@ -156,6 +245,66 @@ export function json3Cues(payload) {
         ? event.segs.map((segment) => (typeof segment?.utf8 === 'string' ? segment.utf8 : '')).join('')
         : ''
     }));
+}
+
+/** Parse YouTube's legacy timed-text XML without accepting arbitrary markup. */
+export function parseTimedText(source) {
+  if (typeof source !== 'string' || !/<transcript(?:\s|>)/i.test(source)) return null;
+  const cues = [];
+  const textPattern = /<text\b([^>]*)>([\s\S]*?)<\/text>/gi;
+  let match;
+  while ((match = textPattern.exec(source)) !== null) {
+    const start = xmlNumberAttribute(match[1], 'start');
+    const duration = xmlNumberAttribute(match[1], 'dur');
+    if (!Number.isFinite(start) || !Number.isFinite(duration)) continue;
+    cues.push({
+      startMs: Math.round(start * 1000),
+      durationMs: Math.round(duration * 1000),
+      text: decodeXmlEntities(match[2]).replace(/<[^>]*>/g, '')
+    });
+  }
+  return cues;
+}
+
+function parseJson3(source) {
+  try {
+    const payload = JSON.parse(source);
+    return Array.isArray(payload?.events) ? json3Cues(payload) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCaptionSource(fetchImpl, url, signal) {
+  const response = await fetchImpl(url, {
+    signal,
+    headers: {
+      accept: 'application/json,text/xml,text/plain;q=0.8',
+      'user-agent': 'BoringNotchDiscussionAnalyzer/0.1'
+    }
+  });
+  if (!response.ok) {
+    throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube did not return the selected caption track.', {
+      retryable: response.status >= 500 || response.status === 429
+    });
+  }
+  return readBoundedText(response, MAX_CAPTION_BYTES, 'caption track');
+}
+
+function xmlNumberAttribute(attributes, name) {
+  const match = new RegExp(`(?:^|\\s)${name}=["']([^"']+)["']`, 'i').exec(attributes);
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+function decodeXmlEntities(value) {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 function sourceForTrack(track) {

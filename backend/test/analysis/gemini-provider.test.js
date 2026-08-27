@@ -5,6 +5,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { DEFAULT_GEMINI_MODEL, createGeminiProvider, toGeminiSchema } from '../../src/analysis/providers/gemini.js';
+
+test('uses Gemini 3.6 Flash by default', () => {
+  assert.equal(DEFAULT_GEMINI_MODEL, 'gemini-3.6-flash');
+});
 import { RESPONSE_SCHEMA } from '../../src/analysis/prompt.js';
 
 const FAKE_KEY = 'not-a-real-key'; // lint-allow-secret
@@ -15,7 +19,7 @@ const okResponse = (text) => ({
   async json() {
     return {
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
-      modelVersion: 'gemini-2.5-flash-001',
+      modelVersion: 'gemini-3.6-flash-001',
       usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 45 }
     };
   }
@@ -54,7 +58,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
 
   const result = await provider.generate(request);
 
-  assert.match(seen.url, /models\/gemini-2\.5-flash:generateContent$/);
+  assert.match(seen.url, /models\/gemini-3\.6-flash:generateContent$/);
   assert.equal(seen.init.headers['x-goog-api-key'], FAKE_KEY);
   assert.equal(seen.url.includes(FAKE_KEY), false, 'the key never lands in the URL');
 
@@ -65,7 +69,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
   assert.equal(body.generationConfig.responseSchema.type, 'OBJECT');
 
   assert.equal(result.text, '{"findings":[]}');
-  assert.equal(result.modelId, 'gemini-2.5-flash-001');
+  assert.equal(result.modelId, 'gemini-3.6-flash-001');
   assert.deepEqual(result.usage, { promptTokens: 120, responseTokens: 45 });
 });
 
@@ -74,6 +78,22 @@ test('the model id is configurable and reported', () => {
 
   assert.equal(provider.modelId, 'gemini-2.5-pro');
   assert.equal(createGeminiProvider({ apiKey: FAKE_KEY }).modelId, DEFAULT_GEMINI_MODEL);
+});
+
+test('logs raw Gemini output only when payload logging is enabled', async () => {
+  const logs = [];
+  const provider = createGeminiProvider({
+    apiKey: FAKE_KEY,
+    fetchImpl: async () => okResponse('{"findings":[]}'),
+    logPayloads: true,
+    logger: { info(message, fields) { logs.push({ message, fields }); } }
+  });
+
+  await provider.generate(request);
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].message, 'gemini output payload');
+  assert.equal(logs[0].fields.output, '{"findings":[]}');
+  assert.equal(JSON.stringify(logs).includes(FAKE_KEY), false);
 });
 
 test('a missing key is a programming error, caught before any request', () => {

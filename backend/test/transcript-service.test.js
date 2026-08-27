@@ -51,6 +51,23 @@ test('forceRefresh bypasses a populated cache', async () => {
   assert.equal(calls, 2);
 });
 
+test('logs the normalized transcript only when payload logging is enabled', async () => {
+  const logs = [];
+  const service = createTranscriptService({
+    provider: { async fetchTranscript() { return providerResult(); } },
+    logPayloads: true,
+    logger: {
+      debug() {},
+      info(message, fields) { logs.push({ message, fields }); }
+    }
+  });
+
+  await service.getTranscript({ videoId: VIDEO_ID });
+  const payloadLog = logs.find(({ message }) => message === 'transcript payload');
+  assert.equal(payloadLog.fields.transcript.videoId, VIDEO_ID);
+  assert.equal(payloadLog.fields.transcript.segments[0].text, 'sensitive transcript text');
+});
+
 test('service applies a bounded timeout to the provider call', async () => {
   const service = createTranscriptService({
     timeoutMs: 20,

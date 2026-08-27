@@ -102,11 +102,18 @@ export function createApiServer({ service, config, logger }) {
         logger?.warn?.('request rejected', { requestId, path: url.pathname, code: body.error.code });
       }
 
+      if (config.logPayloads) {
+        logger?.info?.('frontend response payload', { requestId, status, response: body });
+      }
+
       sendJson(response, status, body, { 'x-request-id': requestId });
       finish(status, { code: body.error.code });
     };
 
     const succeed = (result) => {
+      if (config.logPayloads) {
+        logger?.info?.('frontend response payload', { requestId, status: 200, response: result.analysis });
+      }
       sendJson(response, 200, result.analysis, {
         'x-request-id': requestId,
         ...cacheHeaders(result.cache, result.meta)

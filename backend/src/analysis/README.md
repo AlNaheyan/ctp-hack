@@ -186,7 +186,7 @@ dropped after the fact, and timings always come from the transcript.
 | --- | --- | --- |
 | `ANALYSIS_MODE` | `mock` | `mock` uses the offline stub, `live` uses Gemini |
 | `GEMINI_API_KEY` | unset | Required in live mode only; never logged |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Model id; part of the cache key |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Model id; part of the cache key |
 | `ANALYSIS_TIMEOUT_MS` | `30000` | Per-request model timeout |
 
 ## Tests

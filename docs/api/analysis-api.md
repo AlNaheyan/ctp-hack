@@ -96,7 +96,7 @@ Contains no secrets and no cache keys.
   "analyzer": {
     "provider": "stub",
     "model": "stub-rules-1.0.0",
-    "promptVersion": "argument-analysis-1.0.0",
+    "promptVersion": "argument-analysis-2.0.0",
     "taxonomyVersion": "1.0.0",
     "schemaVersion": 1
   },
@@ -192,13 +192,14 @@ curl -X POST http://127.0.0.1:8787/v1/analyze \
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `PORT` / `HOST` | `8787` / `127.0.0.1` | Listen address |
+| `LOG_PAYLOADS` | `false` | Development-only logging of transcript, Gemini output, and frontend response payloads |
 | `ANALYSIS_MODE` | `mock` | Fixture + stub, or YouTube + Gemini |
 | `TRANSCRIPT_LANGUAGE` | `en-US` | Default caption preference |
-| `TRANSCRIPT_TIMEOUT_MS` | `10000` | Caption retrieval deadline |
+| `TRANSCRIPT_TIMEOUT_MS` | `30000` | Caption retrieval deadline, including the local yt-dlp fallback |
 | `ANALYSIS_TIMEOUT_MS` | `30000` | Per model request deadline |
 | `API_REQUEST_TIMEOUT_MS` | `90000` | Whole cold request deadline |
 | `ANALYSIS_CACHE_TTL_MS` | `86400000` | Result reuse window (24 h) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-2.5-flash` | Live mode only |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.6-flash` | Live mode only |
 
 ## Not in scope here
 

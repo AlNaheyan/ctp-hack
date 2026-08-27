@@ -7,7 +7,7 @@
 
 import { AppError } from '../../errors.js';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 export const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -95,6 +95,8 @@ function mapHttpError(status, providerStatus) {
  * @param {number} [options.timeoutMs]
  * @param {typeof fetch} [options.fetchImpl] injected in tests; no network by default in CI
  * @param {string} [options.baseUrl]
+ * @param {object} [options.logger]
+ * @param {boolean} [options.logPayloads]
  * @returns {import('./index.js').ModelProvider}
  */
 export function createGeminiProvider({
@@ -102,7 +104,9 @@ export function createGeminiProvider({
   model = DEFAULT_GEMINI_MODEL,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchImpl = globalThis.fetch,
-  baseUrl = DEFAULT_BASE_URL
+  baseUrl = DEFAULT_BASE_URL,
+  logger,
+  logPayloads = false
 }) {
   if (typeof apiKey !== 'string' || apiKey.trim() === '') {
     throw new AppError('INTERNAL_ERROR', 'createGeminiProvider requires an API key. Load it through config.requireSecret().');
@@ -179,7 +183,7 @@ export function createGeminiProvider({
         });
       }
 
-      return {
+      const result = {
         text,
         modelId: body?.modelVersion ?? model,
         finishReason: candidate?.finishReason,
@@ -190,6 +194,17 @@ export function createGeminiProvider({
             }
           : undefined
       };
+
+      if (logPayloads) {
+        logger?.info?.('gemini output payload', {
+          modelId: result.modelId,
+          finishReason: result.finishReason,
+          usage: result.usage,
+          output: result.text
+        });
+      }
+
+      return result;
     }
   };
 }

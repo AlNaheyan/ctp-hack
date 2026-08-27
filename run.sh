@@ -7,8 +7,11 @@ DERIVED_DATA_PATH="$SCRIPT_DIR/.build/DerivedData"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/boringNotch.app"
 APP_PROCESS="boringNotch"
 EXTENSION_PATH="$SCRIPT_DIR/extension"
-CHROME_PROFILE_PATH="$SCRIPT_DIR/.build/ChromeExtensionProfile"
-CHROME_BINARY="${GOOGLE_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+API_PORT="${PORT:-3000}"
+API_HOST="${DISCUSSION_API_HOST:-127.0.0.1}"
+API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://$API_HOST:$API_PORT}"
+
+export DISCUSSION_API_BASE_URL="$API_BASE_URL"
 
 cd "$SCRIPT_DIR"
 
@@ -17,13 +20,31 @@ if [ ! -f "$EXTENSION_PATH/manifest.json" ]; then
   exit 1
 fi
 
-if [ ! -x "$CHROME_BINARY" ]; then
-  echo "Google Chrome was not found at: $CHROME_BINARY" >&2
-  echo "Set GOOGLE_CHROME_PATH to the Google Chrome executable and try again." >&2
+if [ ! -d "/Applications/Google Chrome.app" ]; then
+  echo "Google Chrome was not found in /Applications." >&2
   exit 1
 fi
 
-echo "Building boringNotch…"
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "Node.js 20.10+ and npm are required to register the Chrome extension bridge." >&2
+  exit 1
+fi
+
+mkdir -p "$SCRIPT_DIR/.build"
+
+echo "Using the separately managed analysis API at $API_BASE_URL"
+echo "Start it in another terminal with: HOST=$API_HOST PORT=$API_PORT npm run api"
+
+echo "Finding the unpacked extension in the normal Chrome profile..."
+if ! extension_id=$(node "$SCRIPT_DIR/scripts/find-chrome-extension-id.mjs" "$EXTENSION_PATH"); then
+  echo "Unable to register the native messaging host." >&2
+  exit 1
+fi
+
+echo "Registering the native messaging host for extension $extension_id..."
+npm run native:register -- "$extension_id"
+
+echo "Building boringNotch..."
 xcodebuild \
   -quiet \
   -project boringNotch.xcodeproj \
@@ -41,7 +62,7 @@ fi
 
 # Replace only running instances whose executable name exactly matches this app.
 if pgrep -x "$APP_PROCESS" >/dev/null; then
-  echo "Stopping the previous boringNotch instance…"
+  echo "Stopping the previous boringNotch instance..."
   pkill -TERM -x "$APP_PROCESS"
 
   attempts=0
@@ -54,7 +75,7 @@ if pgrep -x "$APP_PROCESS" >/dev/null; then
   done
 
   if pgrep -x "$APP_PROCESS" >/dev/null; then
-    echo "The previous instance did not exit gracefully; force-stopping it…"
+    echo "The previous instance did not exit gracefully; force-stopping it..."
     pkill -KILL -x "$APP_PROCESS"
 
     attempts=0
@@ -76,16 +97,6 @@ fi
 echo "Launching $APP_PATH"
 open -n "$APP_PATH"
 
-# A dedicated profile keeps development flags and extension state isolated from
-# the user's normal Chrome profile. Reusing it also avoids first-run setup on
-# every app rebuild.
-mkdir -p "$CHROME_PROFILE_PATH"
-
-echo "Launching Google Chrome with the unpacked discussion extension…"
-"$CHROME_BINARY" \
-  --user-data-dir="$CHROME_PROFILE_PATH" \
-  --load-extension="$EXTENSION_PATH" \
-  --no-first-run \
-  --no-default-browser-check \
-  "https://www.youtube.com/" \
-  >/dev/null 2>&1 &
+echo "Opening YouTube in the normal Google Chrome profile..."
+echo "Extension source: $EXTENSION_PATH (reload it in chrome://extensions after code changes)"
+open -a "Google Chrome" "https://www.youtube.com/"

@@ -142,6 +142,12 @@ final class DiscussionSessionModel: ObservableObject {
         case let .ready(videoId, eventCount, source):
             selectedVideoId = videoId
             DiscussionPresentationModel.shared.clear()
+            if let analysis = coordinator.session.analysis {
+                DiscussionPresentationModel.shared.receive(
+                    analysis.events,
+                    videoId: analysis.videoId
+                )
+            }
             status = .ready(eventCount: eventCount, cached: source == .cache)
         case let .failure(failure):
             switch failure {
@@ -160,7 +166,7 @@ final class DiscussionSessionModel: ObservableObject {
 
     private static func makeCoordinator() -> DiscussionAnalysisCoordinator {
         let configured = ProcessInfo.processInfo.environment["DISCUSSION_API_BASE_URL"]
-        let baseURL = URL(string: configured ?? "http://127.0.0.1:8787")!
+        let baseURL = URL(string: configured ?? "http://127.0.0.1:3000")!
         let storage: any DiscussionCacheStorage
         if let directory = try? FileDiscussionCacheStorage.defaultDirectory(),
            let files = try? FileDiscussionCacheStorage(directory: directory) {
@@ -303,10 +309,11 @@ private struct PlaybackPositionView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: snapshot.paused ? "pause.fill" : "play.fill")
+            Image(systemName: snapshot.paused ? "play.fill" : "pause.fill")
                 .font(.caption)
                 .foregroundStyle(snapshot.videoId == nil ? Color.secondary : Color.white)
                 .frame(width: 14)
+                .accessibilityLabel(snapshot.paused ? "YouTube paused" : "YouTube playing")
 
             Text(time(snapshot.currentTime))
                 .monospacedDigit()

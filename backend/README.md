@@ -9,7 +9,7 @@ Full runbook: [docs/setup/local-stack.md](../docs/setup/local-stack.md).
 HTTP boundary: [docs/api/analysis-api.md](../docs/api/analysis-api.md).
 
 ```bash
-npm run dev      # analysis API on :8787, mock mode by default
+PORT=3000 npm run api # analysis API in the foreground, with logs in this terminal
 npm run mock     # W1-T4 fixture-playback server with UI scenarios (different program)
 npm run analyze  # analyse a transcript fixture on the command line
 npm test         # unit tests, no network, no key
@@ -67,7 +67,8 @@ errors in [src/analysis/README.md](src/analysis/README.md).
 
 Keep new work behind the interfaces already here: read configuration from
 `config.js`, raise `AppError` with a code from `errors.js`, and log through
-`logger.js` so no transcript text or secret reaches stdout.
+`logger.js`. Transcript and model text reach stdout only when the explicit
+development setting `LOG_PAYLOADS=true` is enabled; secrets never do.
 
 ## Analysis API (W3-T1)
 

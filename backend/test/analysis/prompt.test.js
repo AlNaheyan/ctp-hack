@@ -52,6 +52,27 @@ test('the system prompt requires grounding in real segments', () => {
   assert.match(system, /Never invent timestamps, speakers, or segment ids/i);
 });
 
+test('the system prompt is conservative and matches the server-owned event boundary', () => {
+  const system = buildSystemPrompt();
+
+  assert.match(system, /precision is more important than recall/i);
+  assert.match(system, /confidence is at least 0\.75/i);
+  assert.match(system, /at least 0\.80 for strawman/i);
+  assert.match(system, /summary neutral, understandable by itself, and at most 20 words/i);
+  assert.match(system, /server derives event metadata from segmentId/i);
+  assert.match(system, /Do not add ids, speakers, timestamps, importance, details/i);
+});
+
+test('the system prompt distinguishes each supported classification from common false positives', () => {
+  const system = buildSystemPrompt();
+
+  assert.match(system, /Unsupported does not mean false/i);
+  assert.match(system, /refinement, qualification, acknowledged changes/i);
+  assert.match(system, /possible strawman/i);
+  assert.match(system, /indirect but meaningful answer is not evasion/i);
+  assert.match(system, /summary must name that necessary assumption/i);
+});
+
 test('transcript text is delivered as quoted JSON data, inside explicit markers', () => {
   const user = buildChunkPrompt(chunk, { videoTitle: 'Car-free downtown', language: 'en-US' });
 

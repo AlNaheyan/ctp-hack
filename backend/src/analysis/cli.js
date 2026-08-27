@@ -52,7 +52,7 @@ async function main() {
     return;
   }
 
-  const provider = createProvider(config);
+  const provider = createProvider(config, process.env, { logger });
 
   try {
     const { analysis, meta } = await analyzeTranscript(transcript, {
