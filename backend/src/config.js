@@ -41,7 +41,9 @@ const DEFAULTS = Object.freeze({
   TRANSCRIPT_LANGUAGE: 'en-US',
   TRANSCRIPT_TIMEOUT_MS: '10000',
   TRANSCRIPT_CACHE_TTL_MS: '86400000',
-  ANALYSIS_TIMEOUT_MS: '30000'
+  ANALYSIS_TIMEOUT_MS: '30000',
+  ANALYSIS_CACHE_TTL_MS: '86400000',
+  API_REQUEST_TIMEOUT_MS: '90000'
 });
 
 /** Secrets that live mode needs, with the reason shown when one is missing. */
@@ -130,7 +132,17 @@ export function loadConfig(env = process.env) {
     // Analysis pipeline (W2-T2). The model default lives with the Gemini
     // adapter; an empty GEMINI_MODEL means "use the adapter default".
     geminiModel: env.GEMINI_MODEL === undefined || env.GEMINI_MODEL === '' ? undefined : String(env.GEMINI_MODEL),
-    analysisTimeoutMs: parseInteger(read('ANALYSIS_TIMEOUT_MS'), 'ANALYSIS_TIMEOUT_MS', { min: 1000, max: 300000 })
+    analysisTimeoutMs: parseInteger(read('ANALYSIS_TIMEOUT_MS'), 'ANALYSIS_TIMEOUT_MS', { min: 1000, max: 300000 }),
+    // Analysis API (W3-T1): how long a finished analysis stays reusable, and
+    // the deadline for one cold request end to end.
+    analysisCacheTtlMs: parseInteger(read('ANALYSIS_CACHE_TTL_MS'), 'ANALYSIS_CACHE_TTL_MS', {
+      min: 1000,
+      max: 7 * 24 * 60 * 60 * 1000
+    }),
+    apiRequestTimeoutMs: parseInteger(read('API_REQUEST_TIMEOUT_MS'), 'API_REQUEST_TIMEOUT_MS', {
+      min: 1000,
+      max: 600000
+    })
   });
 }
 
@@ -203,6 +215,8 @@ export function describeConfig(config, env = process.env) {
     `transcript     ${config.transcriptLanguage}, ${config.transcriptTimeoutMs} ms timeout`,
     `analyzer       ${config.mode === 'live' ? `gemini (${config.geminiModel ?? 'adapter default'})` : 'stub rules (offline)'}`,
     `model timeout  ${config.analysisTimeoutMs} ms`,
+    `api timeout    ${config.apiRequestTimeoutMs} ms per cold request`,
+    `result cache   ${Math.round(config.analysisCacheTtlMs / 3600000)} h`,
     ...describeSecrets(env).map((secret) => `${secret.name.padEnd(14)} ${secret.status}`)
   ];
 }

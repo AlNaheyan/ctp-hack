@@ -2,13 +2,16 @@
 // worker reconnects the replaceable transport before forwarding its first item.
 
 import { createPlaybackForwarder } from './playback-forwarder.js';
-import { createMockTransport } from '../transport/mock-transport.js';
+import { createNativeTransport } from '../transport/native-transport.js';
 
-const transport = createMockTransport();
+const transport = createNativeTransport();
 const forwarder = createPlaybackForwarder({ transport });
 
 transport.onStatusChange((status) => {
   console.debug('[boring-notch] transport status', status);
+  void chrome.storage?.session
+    ?.set({ nativeConnectionState: status })
+    .catch((error) => console.warn('[boring-notch] could not persist transport status', String(error)));
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

@@ -11,6 +11,8 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var vm: BoringViewModel
     @StateObject private var discussion = DiscussionSessionModel.shared
+    @StateObject private var presentation = DiscussionPresentationModel.shared
+    @ObservedObject private var coordinator = BoringViewCoordinator.shared
     @State private var closeTask: Task<Void, Never>?
     @State private var isHovering = false
 
@@ -42,13 +44,20 @@ struct ContentView: View {
                         Color.clear
                             .frame(height: max(24, vm.effectiveClosedNotchHeight))
 
-                        NotchHomeView(model: discussion)
+                        NotchHomeView(model: discussion, presentation: presentation)
                             .padding(.top, 8)
                             .padding(.horizontal, contentHorizontalInset)
                     }
                 } else {
-                    Color.clear
-                        .accessibilityLabel("Discussion Notch")
+                    if let event = presentation.activeEvent, !higherPriorityActivityVisible {
+                        CompactDiscussionInsightCard(
+                            event: event,
+                            onDismiss: presentation.dismiss
+                        )
+                    } else {
+                        Color.clear
+                            .accessibilityLabel("Discussion Notch")
+                    }
                 }
             }
             .frame(width: vm.notchSize.width, height: vm.notchSize.height, alignment: .top)
@@ -71,10 +80,22 @@ struct ContentView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .preferredColorScheme(.dark)
-        .onChange(of: discussion.activeInsight?.id) { _, insightID in
-            if insightID != nil {
-                open()
-            } else if !isHovering {
+        .onAppear {
+            presentation.setExpanded(vm.notchState == .open)
+            presentation.setPlaybackPaused(discussion.playback.paused)
+            presentation.setInterrupted(higherPriorityActivityVisible)
+        }
+        .onChange(of: vm.notchState) { _, state in
+            presentation.setExpanded(state == .open)
+        }
+        .onChange(of: discussion.playback.paused) { _, paused in
+            presentation.setPlaybackPaused(paused)
+        }
+        .onChange(of: higherPriorityActivityVisible) { _, interrupted in
+            presentation.setInterrupted(interrupted)
+        }
+        .onChange(of: presentation.activeEvent?.id) { _, insightID in
+            if insightID == nil, !isHovering {
                 scheduleClose()
             }
         }
@@ -95,7 +116,6 @@ struct ContentView: View {
             return
         }
 
-        guard discussion.activeInsight == nil else { return }
         scheduleClose()
     }
 
@@ -106,6 +126,13 @@ struct ContentView: View {
             guard !Task.isCancelled, !isHovering else { return }
             withAnimation(closeSpring) { vm.close() }
         }
+    }
+
+    private var higherPriorityActivityVisible: Bool {
+        let systemHUDVisible = coordinator.sneakPeek.show
+            && coordinator.sneakPeek.type != .music
+            && coordinator.sneakPeek.type != .battery
+        return systemHUDVisible || vm.generalDropTargeting
     }
 }
 
