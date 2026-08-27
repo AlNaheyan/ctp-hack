@@ -67,7 +67,7 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 | `PORT` | `8787` | API port (both servers use it) |
 | `HOST` | `127.0.0.1` | Loopback by default |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
-| `LOG_PAYLOADS` | `false` | Development-only transcript, raw model output, and frontend response logging; may contain sensitive text |
+| `LOG_PAYLOADS` | `false` | Development-only transcript, analyzer input segments, raw model output, and frontend response logging; may contain sensitive text |
 | `FIXTURES_DIR` | `<repo>/fixtures` | Absolute or repo-relative override |
 | `MOCK_LATENCY_MS` | `0` | Artificial analyze latency, 0-60000 |
 | `MOCK_SCENARIO` | `ok` | Default scenario for every request |

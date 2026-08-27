@@ -38,7 +38,8 @@ analyzeTranscript(transcript, {
   minConfidence?,            // default 0 (keep everything the model reports)
   cacheTtlSeconds?,          // default 86400
   signal?,                   // AbortSignal
-  logger?                    // { info, warn, debug }
+  logger?,                   // { info, warn, debug }
+  logPayloads?               // log the exact segment array supplied to the model
 }) => Promise<{ analysis, meta }>
 ```
 

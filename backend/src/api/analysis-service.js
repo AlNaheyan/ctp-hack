@@ -50,6 +50,7 @@ export function buildCacheKey({ videoId, language, modelId }) {
  * @param {number} [options.requestTimeoutMs]
  * @param {() => Date} [options.now] injected clock for deterministic tests
  * @param {object} [options.logger]
+ * @param {boolean} [options.logPayloads]
  */
 export function createAnalysisService({
   transcripts,
@@ -58,7 +59,8 @@ export function createAnalysisService({
   language: defaultLanguage = 'en-US',
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   now = () => new Date(),
-  logger = silentLogger
+  logger = silentLogger,
+  logPayloads = false
 }) {
   if (typeof transcripts?.getTranscript !== 'function') {
     throw new TypeError('transcripts must implement getTranscript(request)');
@@ -79,7 +81,9 @@ export function createAnalysisService({
       provider,
       title: transcript.title,
       now,
-      signal
+      signal,
+      logger,
+      logPayloads
     });
 
     return { analysis, meta, transcriptLanguage: transcript.language };

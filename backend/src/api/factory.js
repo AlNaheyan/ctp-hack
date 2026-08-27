@@ -41,7 +41,8 @@ export function createAnalysisApiService(config, { logger, env = process.env } =
     cache: new AnalysisResultCache({ ttlMs: config.analysisCacheTtlMs }),
     language: config.transcriptLanguage,
     requestTimeoutMs: config.apiRequestTimeoutMs,
-    logger
+    logger,
+    logPayloads: config.logPayloads
   });
 
   return {

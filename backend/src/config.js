@@ -219,7 +219,7 @@ export function describeConfig(config, env = process.env) {
     `listen         http://${config.host}:${config.port}`,
     `fixtures       ${config.fixturesDir}`,
     `log level      ${config.logLevel}`,
-    `payload logs   ${config.logPayloads ? 'enabled (transcript and model data)' : 'disabled'}`,
+    `payload logs   ${config.logPayloads ? 'enabled (transcript, analyzer input, and model output)' : 'disabled'}`,
     `mock scenario  ${config.mockScenario}`,
     `mock latency   ${config.mockLatencyMs} ms`,
     `transcript     ${config.transcriptLanguage}, ${config.transcriptTimeoutMs} ms timeout`,

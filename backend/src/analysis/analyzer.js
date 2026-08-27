@@ -106,6 +106,7 @@ async function analyzeChunk({ chunk, provider, system, context, segmentsById, si
  * @param {number} [options.cacheTtlSeconds]
  * @param {AbortSignal} [options.signal]
  * @param {{ info: Function, warn: Function, debug: Function }} [options.logger]
+ * @param {boolean} [options.logPayloads] log the exact segments supplied to the model
  * @returns {Promise<{ analysis: object, meta: object }>}
  */
 export async function analyzeTranscript(transcript, options) {
@@ -116,7 +117,8 @@ export async function analyzeTranscript(transcript, options) {
     minConfidence = 0,
     cacheTtlSeconds = DEFAULT_CACHE_TTL_SECONDS,
     signal,
-    logger
+    logger,
+    logPayloads = false
   } = options ?? {};
 
   if (provider === undefined || typeof provider.generate !== 'function') {
@@ -154,6 +156,14 @@ export async function analyzeTranscript(transcript, options) {
 
   const system = buildSystemPrompt();
   const context = { videoTitle: title, language: transcript.language };
+
+  if (logPayloads) {
+    logger?.info?.('analysis input payload', {
+      videoId: transcript.videoId,
+      segmentCount: fullTranscript.segments.length,
+      segments: fullTranscript.segments
+    });
+  }
 
   const allFindings = [];
   const allDropped = [];

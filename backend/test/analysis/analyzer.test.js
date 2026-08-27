@@ -147,6 +147,24 @@ test('the entire transcript is sent in one model request', async () => {
   assert.match(provider.calls[0].user, new RegExp(longTranscript.segments.at(-1).id));
 });
 
+test('payload logging shows the exact segments supplied to the model', async () => {
+  const provider = scriptedProvider([{ findings: [] }]);
+  const logs = [];
+  const logger = { info(message, fields) { logs.push({ message, ...fields }); } };
+
+  await analyzeTranscript(GOLDEN_TRANSCRIPT, {
+    provider,
+    now: FIXED_NOW,
+    logger,
+    logPayloads: true
+  });
+
+  const payload = logs.find(({ message }) => message === 'analysis input payload');
+  assert.equal(payload.videoId, GOLDEN_TRANSCRIPT.videoId);
+  assert.equal(payload.segmentCount, GOLDEN_TRANSCRIPT.segments.length);
+  assert.deepEqual(payload.segments, GOLDEN_TRANSCRIPT.segments);
+});
+
 test('unusable output is repaired once and then succeeds', async () => {
   const provider = scriptedProvider([
     'Sorry, I cannot produce JSON for that.',
