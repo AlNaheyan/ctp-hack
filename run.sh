@@ -38,11 +38,22 @@ if pgrep -x "$APP_PROCESS" >/dev/null; then
   done
 
   if pgrep -x "$APP_PROCESS" >/dev/null; then
-    echo "The previous boringNotch instance did not exit cleanly." >&2
-    exit 1
+    echo "The previous instance did not exit gracefully; force-stopping it…"
+    pkill -KILL -x "$APP_PROCESS"
+
+    for _ in {1..20}; do
+      if ! pgrep -x "$APP_PROCESS" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+
+    if pgrep -x "$APP_PROCESS" >/dev/null; then
+      echo "Unable to stop the previous boringNotch instance." >&2
+      exit 1
+    fi
   fi
 fi
 
 echo "Launching $APP_PATH"
 open -n "$APP_PATH"
-
