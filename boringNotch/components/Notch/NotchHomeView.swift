@@ -303,10 +303,11 @@ private struct PlaybackPositionView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: snapshot.paused ? "pause.fill" : "play.fill")
+            Image(systemName: snapshot.paused ? "play.fill" : "pause.fill")
                 .font(.caption)
                 .foregroundStyle(snapshot.videoId == nil ? Color.secondary : Color.white)
                 .frame(width: 14)
+                .accessibilityLabel(snapshot.paused ? "YouTube paused" : "YouTube playing")
 
             Text(time(snapshot.currentTime))
                 .monospacedDigit()
