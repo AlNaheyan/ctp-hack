@@ -35,6 +35,55 @@ public struct PlaybackMessageEnvelope: Codable, Equatable, Sendable {
     self.type = type
     self.payload = payload
   }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion, type, payload
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+    type = try container.decode(String.self, forKey: .type)
+    let wirePayload = try container.decode(WirePlaybackPayload.self, forKey: .payload)
+    payload = wirePayload.playbackState(schemaVersion: schemaVersion)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(schemaVersion, forKey: .schemaVersion)
+    try container.encode(type, forKey: .type)
+    try container.encode(WirePlaybackPayload(payload), forKey: .payload)
+  }
+}
+
+private struct WirePlaybackPayload: Codable {
+  let videoId: String
+  let currentTime: Double
+  let duration: Double
+  let paused: Bool
+  let playbackRate: Double
+  let observedAt: Date
+
+  init(_ state: DiscussionPlaybackState) {
+    videoId = state.videoId
+    currentTime = state.currentTime
+    duration = state.duration
+    paused = state.paused
+    playbackRate = state.playbackRate
+    observedAt = state.observedAt
+  }
+
+  func playbackState(schemaVersion: Int) -> DiscussionPlaybackState {
+    DiscussionPlaybackState(
+      schemaVersion: schemaVersion,
+      videoId: videoId,
+      currentTime: currentTime,
+      duration: duration,
+      paused: paused,
+      playbackRate: playbackRate,
+      observedAt: observedAt
+    )
+  }
 }
 
 public enum NativeMessageCodec {
