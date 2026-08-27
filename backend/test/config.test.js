@@ -18,6 +18,7 @@ test('defaults to mock mode with no environment set', () => {
   assert.equal(config.mode, 'mock');
   assert.equal(config.port, 8787);
   assert.equal(config.host, '127.0.0.1');
+  assert.equal(config.logPayloads, false);
   assert.equal(config.fixturesDir, DEFAULT_FIXTURES_DIR);
   assert.equal(config.mockScenario, 'ok');
   assert.equal(config.mockLatencyMs, 0);
@@ -39,6 +40,12 @@ test('rejects an unknown mode with an actionable message', () => {
 
 test('rejects a non-numeric port', () => {
   assert.throws(() => loadConfig({ PORT: 'eight' }), /PORT must be an integer/);
+});
+
+test('payload logging is explicit and strictly boolean', () => {
+  assert.equal(loadConfig({ LOG_PAYLOADS: 'true' }).logPayloads, true);
+  assert.equal(loadConfig({ LOG_PAYLOADS: '0' }).logPayloads, false);
+  assert.throws(() => loadConfig({ LOG_PAYLOADS: 'sometimes' }), /LOG_PAYLOADS must be true or false/);
 });
 
 test('validates transcript timeout and cache bounds', () => {

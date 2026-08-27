@@ -192,6 +192,7 @@ curl -X POST http://127.0.0.1:8787/v1/analyze \
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `PORT` / `HOST` | `8787` / `127.0.0.1` | Listen address |
+| `LOG_PAYLOADS` | `false` | Development-only logging of transcript, Gemini output, and frontend response payloads |
 | `ANALYSIS_MODE` | `mock` | Fixture + stub, or YouTube + Gemini |
 | `TRANSCRIPT_LANGUAGE` | `en-US` | Default caption preference |
 | `TRANSCRIPT_TIMEOUT_MS` | `30000` | Caption retrieval deadline, including the local yt-dlp fallback |

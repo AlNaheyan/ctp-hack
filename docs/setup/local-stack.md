@@ -67,6 +67,7 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 | `PORT` | `8787` | API port (both servers use it) |
 | `HOST` | `127.0.0.1` | Loopback by default |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
+| `LOG_PAYLOADS` | `false` | Development-only transcript, raw model output, and frontend response logging; may contain sensitive text |
 | `FIXTURES_DIR` | `<repo>/fixtures` | Absolute or repo-relative override |
 | `MOCK_LATENCY_MS` | `0` | Artificial analyze latency, 0-60000 |
 | `MOCK_SCENARIO` | `ok` | Default scenario for every request |
@@ -81,15 +82,17 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 
 ## Analysis API (W3-T1)
 
-`npm run dev` starts the real API on `http://127.0.0.1:8787`: a YouTube URL in,
+`npm run api` starts the real API: a YouTube URL in,
 a cached or freshly generated timeline out. In mock mode it uses transcript
 fixtures and the offline stub analyzer, so the whole URL-to-timeline path works
 with no key and no network. Full reference, including cache headers, cold/warm
 behaviour, and the error table: [docs/api/analysis-api.md](../api/analysis-api.md).
 
 ```bash
-curl http://127.0.0.1:8787/healthz
-curl -X POST http://127.0.0.1:8787/v1/analyze \
+PORT=3000 npm run api
+
+curl http://127.0.0.1:3000/healthz
+curl -X POST http://127.0.0.1:3000/v1/analyze \
   -H "content-type: application/json" \
   -d '{"url":"https://www.youtube.com/watch?v=demoTalk001"}'
 ```

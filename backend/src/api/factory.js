@@ -30,13 +30,14 @@ export function createAnalysisApiService(config, { logger, env = process.env } =
     provider: transcriptProvider,
     cache: new MemoryTranscriptCache({ ttlMs: config.transcriptCacheTtlMs }),
     timeoutMs: config.transcriptTimeoutMs,
-    logger
+    logger,
+    logPayloads: config.logPayloads
   });
 
   const service = createAnalysisService({
     transcripts,
     // Throws an actionable ConfigError in live mode when the key is missing.
-    provider: createProvider(config, env),
+    provider: createProvider(config, env, { logger }),
     cache: new AnalysisResultCache({ ttlMs: config.analysisCacheTtlMs }),
     language: config.transcriptLanguage,
     requestTimeoutMs: config.apiRequestTimeoutMs,

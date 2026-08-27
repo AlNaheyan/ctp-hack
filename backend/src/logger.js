@@ -1,5 +1,5 @@
-// Structured single-line logging. Log identifiers and outcomes, never
-// transcript text, request bodies, or secret values.
+// Structured single-line logging. Payload text is emitted only when the
+// explicit LOG_PAYLOADS development option is enabled; secrets are never logged.
 
 const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 

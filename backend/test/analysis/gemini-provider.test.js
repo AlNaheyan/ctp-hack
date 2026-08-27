@@ -80,6 +80,22 @@ test('the model id is configurable and reported', () => {
   assert.equal(createGeminiProvider({ apiKey: FAKE_KEY }).modelId, DEFAULT_GEMINI_MODEL);
 });
 
+test('logs raw Gemini output only when payload logging is enabled', async () => {
+  const logs = [];
+  const provider = createGeminiProvider({
+    apiKey: FAKE_KEY,
+    fetchImpl: async () => okResponse('{"findings":[]}'),
+    logPayloads: true,
+    logger: { info(message, fields) { logs.push({ message, fields }); } }
+  });
+
+  await provider.generate(request);
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].message, 'gemini output payload');
+  assert.equal(logs[0].fields.output, '{"findings":[]}');
+  assert.equal(JSON.stringify(logs).includes(FAKE_KEY), false);
+});
+
 test('a missing key is a programming error, caught before any request', () => {
   assert.throws(() => createGeminiProvider({ apiKey: '' }), (error) => {
     assert.equal(error.code, 'INTERNAL_ERROR');

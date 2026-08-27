@@ -66,6 +66,35 @@ test('POST /v1/analyze turns a watch URL into a contract-valid timeline', async 
   assert.equal(response.headers.get('age'), '0');
 });
 
+test('payload logging records the exact successful body returned to the frontend', async () => {
+  const lines = [];
+  const payloadConfig = loadConfig({
+    ANALYSIS_MODE: 'mock',
+    PORT: '0',
+    HOST: '127.0.0.1',
+    LOG_PAYLOADS: 'true'
+  });
+  const payloadLogger = createLogger({
+    level: 'info',
+    stream: { write(line) { lines.push(JSON.parse(line)); } }
+  });
+  const wired = createAnalysisApiService(payloadConfig, { logger: payloadLogger, env: {} });
+  const isolated = await startApiServer({ service: wired.service, config: payloadConfig, logger: payloadLogger });
+
+  try {
+    const response = await fetch(`${isolated.url}/v1/analyze`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: URL_FOR() })
+    });
+    const body = await response.json();
+    const payloadLog = lines.find(({ message }) => message === 'frontend response payload');
+    assert.deepEqual(payloadLog.response, body);
+  } finally {
+    await isolated.close();
+  }
+});
+
 test('the second request is served from cache', async () => {
   const response = await post('/v1/analyze', { url: URL_FOR() });
   await response.body?.cancel();

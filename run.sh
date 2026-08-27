@@ -10,9 +10,6 @@ EXTENSION_PATH="$SCRIPT_DIR/extension"
 API_PORT="${PORT:-3000}"
 API_HOST="${DISCUSSION_API_HOST:-127.0.0.1}"
 API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://$API_HOST:$API_PORT}"
-BACKEND_HEALTH_URL="$API_BASE_URL/healthz"
-BACKEND_LOG_PATH="$SCRIPT_DIR/.build/analysis-api.log"
-BACKEND_PID_PATH="$SCRIPT_DIR/.build/analysis-api.pid"
 
 export DISCUSSION_API_BASE_URL="$API_BASE_URL"
 
@@ -28,97 +25,15 @@ if [ ! -d "/Applications/Google Chrome.app" ]; then
   exit 1
 fi
 
-backend_is_ready() {
-  curl --fail --silent --show-error --max-time 1 "$BACKEND_HEALTH_URL" >/dev/null 2>&1
-}
-
-is_repo_backend() {
-  backend_command=$(ps -p "$1" -o command= 2>/dev/null || true)
-  case "$backend_command" in
-    *"$SCRIPT_DIR/backend/src/index.js"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-stop_backend() {
-  backend_to_stop="$1"
-  if ! kill -0 "$backend_to_stop" 2>/dev/null; then
-    return 0
-  fi
-
-  if ! is_repo_backend "$backend_to_stop"; then
-    echo "Ignoring stale backend PID $backend_to_stop because it is not this repository's analysis API." >&2
-    return 0
-  fi
-
-  echo "Stopping the previous analysis API (PID $backend_to_stop)..."
-  kill -TERM "$backend_to_stop" 2>/dev/null || return 0
-
-  attempts=0
-  while [ "$attempts" -lt 30 ] && kill -0 "$backend_to_stop" 2>/dev/null; do
-    sleep 0.1
-    attempts=$((attempts + 1))
-  done
-
-  if kill -0 "$backend_to_stop" 2>/dev/null; then
-    echo "The previous analysis API did not exit gracefully; force-stopping it..."
-    kill -KILL "$backend_to_stop" 2>/dev/null || true
-  fi
-}
-
-if ! command -v node >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v "${YT_DLP_PATH:-yt-dlp}" >/dev/null 2>&1; then
-  echo "Node.js 20.10+, curl, and yt-dlp are required to run the live analysis stack." >&2
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "Node.js 20.10+ and npm are required to register the Chrome extension bridge." >&2
   exit 1
 fi
 
 mkdir -p "$SCRIPT_DIR/.build"
 
-# Stop the PID recorded by a previous run. Older versions did not write a PID
-# file, so also inspect the configured port and stop only a matching repo API.
-if [ -f "$BACKEND_PID_PATH" ]; then
-  previous_backend_pid=$(cat "$BACKEND_PID_PATH")
-  case "$previous_backend_pid" in
-    ''|*[!0-9]*) echo "Ignoring invalid backend PID file: $BACKEND_PID_PATH" >&2 ;;
-    *) stop_backend "$previous_backend_pid" ;;
-  esac
-fi
-rm -f "$BACKEND_PID_PATH"
-
-if command -v lsof >/dev/null 2>&1; then
-  for listener_pid in $(lsof -nP -tiTCP:"$API_PORT" -sTCP:LISTEN 2>/dev/null || true); do
-    if is_repo_backend "$listener_pid"; then
-      stop_backend "$listener_pid"
-    fi
-  done
-fi
-
-: > "$BACKEND_LOG_PATH"
-
-echo "Starting the analysis API at ${API_BASE_URL}..."
-nohup env HOST="$API_HOST" PORT="$API_PORT" node "$SCRIPT_DIR/backend/src/index.js" >"$BACKEND_LOG_PATH" 2>&1 &
-backend_pid=$!
-printf '%s\n' "$backend_pid" > "$BACKEND_PID_PATH"
-
-attempts=0
-while [ "$attempts" -lt 100 ]; do
-  if backend_is_ready; then
-    break
-  fi
-  if ! kill -0 "$backend_pid" 2>/dev/null; then
-    break
-  fi
-  sleep 0.1
-  attempts=$((attempts + 1))
-done
-
-if ! backend_is_ready; then
-  rm -f "$BACKEND_PID_PATH"
-  echo "Analysis API failed to become ready. Recent log output:" >&2
-  tail -n 40 "$BACKEND_LOG_PATH" >&2
-  exit 1
-fi
-
-echo "Analysis API ready (PID $backend_pid; log: $BACKEND_LOG_PATH)"
+echo "Using the separately managed analysis API at $API_BASE_URL"
+echo "Start it in another terminal with: HOST=$API_HOST PORT=$API_PORT npm run api"
 
 echo "Finding the unpacked extension in the normal Chrome profile..."
 if ! extension_id=$(node "$SCRIPT_DIR/scripts/find-chrome-extension-id.mjs" "$EXTENSION_PATH"); then

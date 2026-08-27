@@ -36,14 +36,17 @@ export { createGeminiProvider, createStubProvider, DEFAULT_GEMINI_MODEL };
  *
  * @param {{ mode: string, geminiModel?: string, analysisTimeoutMs?: number }} config
  * @param {Record<string, string | undefined>} [env]
+ * @param {{ logger?: object }} [options]
  * @returns {ModelProvider}
  */
-export function createProvider(config, env = process.env) {
+export function createProvider(config, env = process.env, { logger } = {}) {
   if (config.mode === 'live') {
     return createGeminiProvider({
       apiKey: requireSecret('GEMINI_API_KEY', env),
       model: config.geminiModel ?? DEFAULT_GEMINI_MODEL,
-      timeoutMs: config.analysisTimeoutMs
+      timeoutMs: config.analysisTimeoutMs,
+      logger,
+      logPayloads: config.logPayloads
     });
   }
 

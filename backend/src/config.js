@@ -36,6 +36,7 @@ const DEFAULTS = Object.freeze({
   PORT: '8787',
   HOST: '127.0.0.1',
   LOG_LEVEL: 'info',
+  LOG_PAYLOADS: 'false',
   MOCK_LATENCY_MS: '0',
   MOCK_SCENARIO: 'ok',
   TRANSCRIPT_LANGUAGE: 'en-US',
@@ -79,6 +80,13 @@ function parseLanguage(value) {
   return language;
 }
 
+function parseBoolean(value, name) {
+  const normalized = String(value).toLowerCase();
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+  throw new ConfigError(`${name} must be true or false. Got "${value}". Fix it in .env (see .env.example).`);
+}
+
 /**
  * Build the frozen runtime config. Throws ConfigError with an actionable
  * message - never the offending secret value - when something is unusable.
@@ -117,6 +125,7 @@ export function loadConfig(env = process.env) {
     port: parseInteger(read('PORT'), 'PORT', { min: 0, max: 65535 }),
     host: String(read('HOST')),
     logLevel: String(read('LOG_LEVEL')).toLowerCase(),
+    logPayloads: parseBoolean(read('LOG_PAYLOADS'), 'LOG_PAYLOADS'),
     fixturesDir,
     mockLatencyMs: parseInteger(read('MOCK_LATENCY_MS'), 'MOCK_LATENCY_MS', { min: 0, max: 60000 }),
     mockScenario: scenario,
@@ -210,6 +219,7 @@ export function describeConfig(config, env = process.env) {
     `listen         http://${config.host}:${config.port}`,
     `fixtures       ${config.fixturesDir}`,
     `log level      ${config.logLevel}`,
+    `payload logs   ${config.logPayloads ? 'enabled (transcript and model data)' : 'disabled'}`,
     `mock scenario  ${config.mockScenario}`,
     `mock latency   ${config.mockLatencyMs} ms`,
     `transcript     ${config.transcriptLanguage}, ${config.transcriptTimeoutMs} ms timeout`,

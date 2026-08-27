@@ -18,7 +18,8 @@ export function createTranscriptService({
   cache = new MemoryTranscriptCache(),
   timeoutMs = 10_000,
   clock = Date.now,
-  logger = silentLogger
+  logger = silentLogger,
+  logPayloads = false
 } = {}) {
   if (typeof provider?.fetchTranscript !== 'function') {
     throw new TypeError('provider must implement fetchTranscript(request)');
@@ -71,6 +72,9 @@ export function createTranscriptService({
       }
 
       const transcript = normalizeTranscript(providerResult, { clock });
+      if (logPayloads) {
+        logger.info('transcript payload', { videoId, transcript });
+      }
       const cacheKey = buildTranscriptCacheKey(transcript);
       cache.set(cacheKey, transcript);
       logger.info('transcript retrieved', {
