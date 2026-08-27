@@ -69,6 +69,11 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 | `FIXTURES_DIR` | `<repo>/fixtures` | Absolute or repo-relative override |
 | `MOCK_LATENCY_MS` | `0` | Artificial analyze latency, 0-60000 |
 | `MOCK_SCENARIO` | `ok` | Default scenario for every request |
+| `TRANSCRIPT_LANGUAGE` | `en-US` | W2-T1 caption preference: exact language, then base language |
+| `TRANSCRIPT_TIMEOUT_MS` | `10000` | W2-T1 overall YouTube request timeout, 100-60000 ms |
+| `TRANSCRIPT_CACHE_TTL_MS` | `86400000` | W2-T1 in-process normalized transcript cache TTL |
+| `ANALYSIS_TIMEOUT_MS` | `30000` | W2-T2 model request timeout, 1000-300000 ms |
+| `GEMINI_MODEL` | adapter default | Optional W2-T2 model override |
 | `GEMINI_API_KEY` | unset | Live mode only. Never needed in mock mode |
 
 ## Mock API
@@ -226,6 +231,8 @@ cannot automate:
 - **Port:** 8787 (`PORT`), bound to `127.0.0.1` (`HOST`).
 - **Environment variables introduced:** `ANALYSIS_MODE`, `PORT`, `HOST`,
   `LOG_LEVEL`, `FIXTURES_DIR`, `MOCK_LATENCY_MS`, `MOCK_SCENARIO`,
+  `TRANSCRIPT_LANGUAGE`, `TRANSCRIPT_TIMEOUT_MS`,
+  `TRANSCRIPT_CACHE_TTL_MS`, `ANALYSIS_TIMEOUT_MS`, `GEMINI_MODEL`, and
   `GEMINI_API_KEY` (live only). All documented in `.env.example`.
 - **Directories added:** `backend/`, `extension/`, `scripts/`, and
   `docs/setup/local-stack.md`. Generated at runtime:
