@@ -5,6 +5,7 @@
 //  Focused discussion-analyzer notch surface.
 //
 
+import Defaults
 import SwiftUI
 
 @MainActor
@@ -14,6 +15,7 @@ struct ContentView: View {
     @StateObject private var presentation = DiscussionPresentationModel.shared
     @ObservedObject private var coordinator = BoringViewCoordinator.shared
     @State private var closeTask: Task<Void, Never>?
+    @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering = false
 
     private let contentHorizontalInset: CGFloat = 32
@@ -110,9 +112,15 @@ struct ContentView: View {
     private func handleHover(_ hovering: Bool) {
         isHovering = hovering
         closeTask?.cancel()
+        hoverTask?.cancel()
 
         if hovering {
-            open()
+            guard vm.notchState == .closed, Defaults[.openNotchOnHover] else { return }
+            hoverTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
+                guard !Task.isCancelled, isHovering, vm.notchState == .closed else { return }
+                open()
+            }
             return
         }
 
