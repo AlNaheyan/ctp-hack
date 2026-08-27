@@ -10,7 +10,7 @@
 // the two external boundaries change.
 
 import { MemoryTranscriptCache, createTranscriptService } from '../transcript/index.js';
-import { YouTubeCaptionProvider } from '../transcript/youtube-provider.js';
+import { YtDlpCaptionProvider } from '../transcript/yt-dlp-provider.js';
 import { createProvider } from '../analysis/index.js';
 import { AnalysisResultCache } from './result-cache.js';
 import { createAnalysisService } from './analysis-service.js';
@@ -23,7 +23,7 @@ import { createFixtureTranscriptProvider } from './fixture-transcripts.js';
 export function createAnalysisApiService(config, { logger, env = process.env } = {}) {
   const transcriptProvider =
     config.mode === 'live'
-      ? new YouTubeCaptionProvider()
+      ? new YtDlpCaptionProvider({ executable: env.YT_DLP_PATH || 'yt-dlp' })
       : createFixtureTranscriptProvider({ fixturesDir: config.fixturesDir });
 
   const transcripts = createTranscriptService({

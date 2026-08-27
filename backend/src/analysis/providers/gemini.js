@@ -7,7 +7,7 @@
 
 import { AppError } from '../../errors.js';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 export const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const DEFAULT_TIMEOUT_MS = 30000;
 

@@ -5,6 +5,7 @@ import {
   YouTubeCaptionProvider,
   extractInitialPlayerResponse,
   json3Cues,
+  parseTimedText,
   selectCaptionTrack
 } from '../src/transcript/youtube-provider.js';
 
@@ -57,6 +58,14 @@ test('converts JSON3 events into provider-neutral cues', () => {
   );
 });
 
+test('converts timed-text XML into provider-neutral cues', () => {
+  assert.deepEqual(
+    parseTimedText('<transcript><text start="1.2" dur="0.75">Hello &amp; goodbye</text></transcript>'),
+    [{ startMs: 1200, durationMs: 750, text: 'Hello & goodbye' }]
+  );
+  assert.equal(parseTimedText('not captions'), null);
+});
+
 test('fetches the selected caption track through the provider boundary', async () => {
   const calls = [];
   const provider = new YouTubeCaptionProvider({
@@ -77,6 +86,23 @@ test('fetches the selected caption track through the provider boundary', async (
   assert.deepEqual(result.cues, [{ startMs: 1000, durationMs: 750, text: 'Hello' }]);
   assert.match(calls[0], /\/watch\?v=dQw4w9WgXcQ/);
   assert.match(calls[1], /fmt=json3/);
+});
+
+test('falls back to timed-text XML when JSON3 is unreadable', async () => {
+  const calls = [];
+  const provider = new YouTubeCaptionProvider({
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (calls.length === 1) return new Response(watchPage(player({ tracks: [track('en')] })));
+      if (calls.length === 2) return new Response('');
+      return new Response('<transcript><text start="1" dur="0.5">Fallback works</text></transcript>');
+    }
+  });
+
+  const result = await provider.fetchTranscript({ videoId: VIDEO_ID, language: 'en-US' });
+  assert.deepEqual(result.cues, [{ startMs: 1000, durationMs: 500, text: 'Fallback works' }]);
+  assert.match(calls[1], /fmt=json3/);
+  assert.doesNotMatch(calls[2], /fmt=json3/);
 });
 
 test('maps private, deleted, captions-disabled, and unsupported-language videos', async () => {

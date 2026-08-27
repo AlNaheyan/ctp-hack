@@ -54,26 +54,19 @@ export class YouTubeCaptionProvider {
 
     const track = selectCaptionTrack(tracks, { language, captionSource });
     const trackUrl = validateTrackUrl(track.baseUrl);
-    trackUrl.searchParams.set('fmt', 'json3');
+    const jsonUrl = new URL(trackUrl);
+    jsonUrl.searchParams.set('fmt', 'json3');
+    const jsonSource = await fetchCaptionSource(this.fetchImpl, jsonUrl, signal);
+    let cues = parseJson3(jsonSource);
 
-    const captionResponse = await this.fetchImpl(trackUrl, {
-      signal,
-      headers: {
-        accept: 'application/json,text/plain;q=0.8',
-        'user-agent': 'BoringNotchDiscussionAnalyzer/0.1'
-      }
-    });
-    if (!captionResponse.ok) {
-      throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube did not return the selected caption track.', {
-        retryable: captionResponse.status >= 500 || captionResponse.status === 429
-      });
+    // Some public tracks advertise a valid URL but return an empty or non-JSON
+    // body when JSON3 is requested. Retry YouTube's native timed-text format.
+    if (cues === null) {
+      const timedTextSource = await fetchCaptionSource(this.fetchImpl, trackUrl, signal);
+      cues = parseTimedText(timedTextSource);
     }
 
-    const source = await readBoundedText(captionResponse, MAX_CAPTION_BYTES, 'caption track');
-    let payload;
-    try {
-      payload = JSON.parse(source);
-    } catch {
+    if (cues === null) {
       throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube returned an unreadable caption track.', {
         retryable: true
       });
@@ -83,7 +76,7 @@ export class YouTubeCaptionProvider {
       videoId,
       language: track.languageCode,
       captionSource: sourceForTrack(track),
-      cues: json3Cues(payload)
+      cues
     };
   }
 }
@@ -156,6 +149,66 @@ export function json3Cues(payload) {
         ? event.segs.map((segment) => (typeof segment?.utf8 === 'string' ? segment.utf8 : '')).join('')
         : ''
     }));
+}
+
+/** Parse YouTube's legacy timed-text XML without accepting arbitrary markup. */
+export function parseTimedText(source) {
+  if (typeof source !== 'string' || !/<transcript(?:\s|>)/i.test(source)) return null;
+  const cues = [];
+  const textPattern = /<text\b([^>]*)>([\s\S]*?)<\/text>/gi;
+  let match;
+  while ((match = textPattern.exec(source)) !== null) {
+    const start = xmlNumberAttribute(match[1], 'start');
+    const duration = xmlNumberAttribute(match[1], 'dur');
+    if (!Number.isFinite(start) || !Number.isFinite(duration)) continue;
+    cues.push({
+      startMs: Math.round(start * 1000),
+      durationMs: Math.round(duration * 1000),
+      text: decodeXmlEntities(match[2]).replace(/<[^>]*>/g, '')
+    });
+  }
+  return cues;
+}
+
+function parseJson3(source) {
+  try {
+    const payload = JSON.parse(source);
+    return Array.isArray(payload?.events) ? json3Cues(payload) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCaptionSource(fetchImpl, url, signal) {
+  const response = await fetchImpl(url, {
+    signal,
+    headers: {
+      accept: 'application/json,text/xml,text/plain;q=0.8',
+      'user-agent': 'BoringNotchDiscussionAnalyzer/0.1'
+    }
+  });
+  if (!response.ok) {
+    throw new AppError('TRANSCRIPT_UNAVAILABLE', 'YouTube did not return the selected caption track.', {
+      retryable: response.status >= 500 || response.status === 429
+    });
+  }
+  return readBoundedText(response, MAX_CAPTION_BYTES, 'caption track');
+}
+
+function xmlNumberAttribute(attributes, name) {
+  const match = new RegExp(`(?:^|\\s)${name}=["']([^"']+)["']`, 'i').exec(attributes);
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+function decodeXmlEntities(value) {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 function sourceForTrack(track) {

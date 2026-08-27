@@ -262,6 +262,18 @@ test('retries one failed send so a restarting service worker can wake', () => {
   assert.equal(runtime.messages.length, 2);
 });
 
+test('stops observing when an extension reload invalidates the content script', () => {
+  const runtime = executeContentScript({ href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+  runtime.runtime.sendMessage = () => {
+    throw new Error('Extension context invalidated.');
+  };
+
+  assert.doesNotThrow(() => runtime.video.dispatch('seeked'));
+  assert.equal(runtime.video.listenerCount('play'), 0);
+  assert.equal(runtime.intervals.size, 0);
+  assert.equal(runtime.mutationObservers.filter(({ connected }) => connected).length, 0);
+});
+
 test('suppresses messages when the page has no video id', () => {
   const runtime = executeContentScript({ href: 'https://www.youtube.com/feed/subscriptions' });
   assert.deepEqual(runtime.messages, []);

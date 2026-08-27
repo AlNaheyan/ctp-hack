@@ -60,14 +60,28 @@
   }
 
   function deliver(message, attempt = 0) {
-    chrome.runtime.sendMessage(message, () => {
-      const failed = Boolean(chrome.runtime.lastError);
-      if (failed && attempt === 0 && !disposed) {
-        // sendMessage wakes an MV3 worker. One bounded retry covers the short
-        // startup/reload window without creating a permanent polling loop.
-        setTimeout(() => deliver(message, 1), PLAYING_INTERVAL_MS);
-      }
-    });
+    if (disposed) return;
+    try {
+      chrome.runtime.sendMessage(message, () => {
+        let failed;
+        try {
+          failed = Boolean(chrome.runtime.lastError);
+        } catch {
+          // Reloading an unpacked extension invalidates scripts already living
+          // in open tabs. Stop their polling until Chrome injects the new script
+          // after the tab itself is reloaded.
+          controller.dispose();
+          return;
+        }
+        if (failed && attempt === 0 && !disposed) {
+          // sendMessage wakes an MV3 worker. One bounded retry covers the short
+          // startup/reload window without creating a permanent polling loop.
+          setTimeout(() => deliver(message, 1), PLAYING_INTERVAL_MS);
+        }
+      });
+    } catch {
+      controller.dispose();
+    }
   }
 
   function report(reason) {
