@@ -1,15 +1,18 @@
 # Backend
 
-Node service for the discussion analyzer. Wave 1 ships the **mock API only**:
-golden fixtures over the HTTP shape W3-T1 will own, with no network calls and no
-secrets.
+Node service for the discussion analyzer: a YouTube URL in, a timestamped
+timeline of argument insights out. It runs fully offline in `mock` mode
+(fixture transcripts + the stub analyzer, no secrets) and against YouTube and
+Gemini in `live` mode.
 
 Full runbook: [docs/setup/local-stack.md](../docs/setup/local-stack.md).
+HTTP boundary: [docs/api/analysis-api.md](../docs/api/analysis-api.md).
 
 ```bash
-npm run dev     # from the repo root: preflight + mock API on :8787
-npm run mock    # mock API alone
-npm test        # unit tests
+npm run dev      # analysis API on :8787, mock mode by default
+npm run mock     # W1-T4 fixture-playback server with UI scenarios (different program)
+npm run analyze  # analyse a transcript fixture on the command line
+npm test         # unit tests, no network, no key
 ```
 
 ## Layout
@@ -22,7 +25,13 @@ backend/
     errors.js          typed errors and the wire error body
     fixtures.js        canonical fixture lookup (no second copy of any fixture)
     logger.js          single-line JSON logging
-    index.js           entry point: mock today, real pipeline from W3-T1
+    index.js           entry point: starts the analysis API in either mode
+    api/               HTTP boundary + orchestration (W3-T1), see docs/api/
+      server.js        routes, cache headers, typed error mapping
+      analysis-service.js  URL -> transcript -> analysis, cache + coalescing
+      result-cache.js  24 h final-result cache with age/expiry metadata
+      fixture-transcripts.js  offline transcript source for mock mode
+      factory.js       wiring: which transcript source and model provider
     mock/
       server.js        the mock HTTP API
       scenarios.js     latency and failure simulation
@@ -54,11 +63,32 @@ errors in [src/analysis/README.md](src/analysis/README.md).
 | --- | --- |
 | W2-T1 | ✅ landed: transcript ingestion service, real URL parser, transcript cache |
 | W2-T2 | ✅ landed: `src/analysis/` — analyzer interface, Gemini adapter, prompt/chunker/validator |
-| W3-T1 | `POST /analyze` orchestration, 24 h result cache, request coalescing |
+| W3-T1 | ✅ landed: `src/api/` — analyze/health routes, 24 h result cache, request coalescing |
 
 Keep new work behind the interfaces already here: read configuration from
 `config.js`, raise `AppError` with a code from `errors.js`, and log through
 `logger.js` so no transcript text or secret reaches stdout.
+
+## Analysis API (W3-T1)
+
+`src/api/` composes the two Wave 2 services and is the only HTTP surface
+clients use. Routes, headers, cold/warm/concurrent behaviour, the error table,
+and known test URLs are documented in
+[docs/api/analysis-api.md](../docs/api/analysis-api.md).
+
+```js
+import { createAnalysisApiService, startApiServer } from './src/api/index.js';
+
+const { service } = createAnalysisApiService(config, { logger });
+await startApiServer({ service, config, logger });
+```
+
+`service.analyze({ url | videoId, language?, forceRefresh?, signal? })` returns
+`{ analysis, meta, cache }` without touching HTTP, which is how the route tests
+and any future in-process caller use it. The cache key is
+`videoId | language | schemaVersion | model | promptVersion | taxonomyVersion`,
+so a model or prompt change misses stale entries instead of serving them, and
+concurrent identical requests share one job.
 
 ## Transcript ingestion (W2-T1)
 

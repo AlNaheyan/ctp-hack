@@ -26,7 +26,7 @@ anyway once Wave 2 adds real packages.
 ```bash
 git clone <this repo> && cd ctp-hack
 cp .env.example .env          # mock mode needs no secrets
-npm run dev                   # starts the backend in mock mode on :8787
+npm run dev                   # starts the analysis API in mock mode on :8787
 ```
 
 In a second terminal:
@@ -38,15 +38,16 @@ curl -X POST http://127.0.0.1:8787/v1/analyze \
   -d '{"url":"https://www.youtube.com/watch?v=demoTalk001"}'
 ```
 
-The second command returns the golden analysis fixture: `schemaVersion 1`, two
-speakers, five insight events sorted by `triggerTime`.
+The second command returns a `schemaVersion 1` timeline for the demo
+discussion: two speakers, five insight events sorted by `triggerTime`. In mock
+mode that comes from the transcript fixture and the offline stub analyzer.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Preflight checks, then the backend in mock mode (one-command startup) |
-| `npm run mock` | The mock API alone, without the preflight banner |
+| `npm run dev` | Preflight checks, then the analysis API (W3-T1) in mock mode (one-command startup). See [docs/api/analysis-api.md](../api/analysis-api.md) |
+| `npm run mock` | The W1-T4 fixture-playback server with `?scenario=` UI simulation — a different program from the analysis API, same port |
 | `npm run analyze` | Analyse a transcript fixture and print the analysis JSON (offline stub; `-- --live` uses Gemini). See [backend/src/analysis/README.md](../../backend/src/analysis/README.md) |
 | `npm test` | All backend and extension unit tests (`node --test`) |
 | `npm run test:backend` / `npm run test:extension` | One lane only |
@@ -62,8 +63,8 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `ANALYSIS_MODE` | `mock` | `live` is reserved for W2-T1/W2-T2/W3-T1 and currently exits with a pointer to those tickets |
-| `PORT` | `8787` | Mock API port |
+| `ANALYSIS_MODE` | `mock` | `mock` = fixture transcripts + offline stub analyzer, no secrets. `live` = YouTube captions + Gemini |
+| `PORT` | `8787` | API port (both servers use it) |
 | `HOST` | `127.0.0.1` | Loopback by default |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `FIXTURES_DIR` | `<repo>/fixtures` | Absolute or repo-relative override |
@@ -73,13 +74,31 @@ file, so `PORT=9000 npm run dev` works without editing anything.
 | `TRANSCRIPT_TIMEOUT_MS` | `10000` | W2-T1 overall YouTube request timeout, 100-60000 ms |
 | `TRANSCRIPT_CACHE_TTL_MS` | `86400000` | W2-T1 in-process normalized transcript cache TTL |
 | `ANALYSIS_TIMEOUT_MS` | `30000` | W2-T2 model request timeout, 1000-300000 ms |
+| `API_REQUEST_TIMEOUT_MS` | `90000` | W3-T1 deadline for one cold request, 1000-600000 ms |
+| `ANALYSIS_CACHE_TTL_MS` | `86400000` | W3-T1 result reuse window (24 h) |
 | `GEMINI_MODEL` | adapter default | Optional W2-T2 model override |
 | `GEMINI_API_KEY` | unset | Live mode only. Never needed in mock mode |
 
-## Mock API
+## Analysis API (W3-T1)
 
-Base URL `http://127.0.0.1:8787`. The routes mirror the shape W3-T1 will own, so
-client code written against the mock keeps working after the real API lands.
+`npm run dev` starts the real API on `http://127.0.0.1:8787`: a YouTube URL in,
+a cached or freshly generated timeline out. In mock mode it uses transcript
+fixtures and the offline stub analyzer, so the whole URL-to-timeline path works
+with no key and no network. Full reference, including cache headers, cold/warm
+behaviour, and the error table: [docs/api/analysis-api.md](../api/analysis-api.md).
+
+```bash
+curl http://127.0.0.1:8787/healthz
+curl -X POST http://127.0.0.1:8787/v1/analyze \
+  -H "content-type: application/json" \
+  -d '{"url":"https://www.youtube.com/watch?v=demoTalk001"}'
+```
+
+## Fixture-playback server (W1-T4)
+
+`npm run mock` starts a separate program on the same port that replays golden
+fixtures byte for byte and simulates UI states. Use it for W1-T3 state work; use
+the analysis API above for real behaviour. Run one or the other, not both.
 
 | Route | Purpose |
 | --- | --- |
