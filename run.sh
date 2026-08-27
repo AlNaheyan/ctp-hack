@@ -7,8 +7,6 @@ DERIVED_DATA_PATH="$SCRIPT_DIR/.build/DerivedData"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/boringNotch.app"
 APP_PROCESS="boringNotch"
 EXTENSION_PATH="$SCRIPT_DIR/extension"
-CHROME_PROFILE_PATH="$SCRIPT_DIR/.build/ChromeExtensionProfile"
-CHROME_BINARY="${GOOGLE_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 API_PORT="${PORT:-3000}"
 API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://127.0.0.1:$API_PORT}"
 BACKEND_HEALTH_URL="$API_BASE_URL/healthz"
@@ -24,9 +22,8 @@ if [ ! -f "$EXTENSION_PATH/manifest.json" ]; then
   exit 1
 fi
 
-if [ ! -x "$CHROME_BINARY" ]; then
-  echo "Google Chrome was not found at: $CHROME_BINARY" >&2
-  echo "Set GOOGLE_CHROME_PATH to the Google Chrome executable and try again." >&2
+if [ ! -d "/Applications/Google Chrome.app" ]; then
+  echo "Google Chrome was not found in /Applications." >&2
   exit 1
 fi
 
@@ -175,16 +172,6 @@ fi
 echo "Launching $APP_PATH"
 open -n "$APP_PATH"
 
-# A dedicated profile keeps development flags and extension state isolated from
-# the user's normal Chrome profile. Reusing it also avoids first-run setup on
-# every app rebuild.
-mkdir -p "$CHROME_PROFILE_PATH"
-
-echo "Launching Google Chrome with the unpacked discussion extension..."
-"$CHROME_BINARY" \
-  --user-data-dir="$CHROME_PROFILE_PATH" \
-  --load-extension="$EXTENSION_PATH" \
-  --no-first-run \
-  --no-default-browser-check \
-  "https://www.youtube.com/" \
-  >/dev/null 2>&1 &
+echo "Opening YouTube in the normal Google Chrome profile..."
+echo "Extension source: $EXTENSION_PATH (reload it in chrome://extensions after code changes)"
+open -a "Google Chrome" "https://www.youtube.com/"
