@@ -1,13 +1,28 @@
 #!/bin/zsh
 
 set -euo pipefail
+setopt NO_BG_NICE
 
 SCRIPT_DIR="${0:A:h}"
 DERIVED_DATA_PATH="$SCRIPT_DIR/.build/DerivedData"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/boringNotch.app"
 APP_PROCESS="boringNotch"
+EXTENSION_PATH="$SCRIPT_DIR/extension"
+CHROME_PROFILE_PATH="$SCRIPT_DIR/.build/ChromeExtensionProfile"
+CHROME_BINARY="${GOOGLE_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
 cd "$SCRIPT_DIR"
+
+if [[ ! -f "$EXTENSION_PATH/manifest.json" ]]; then
+  echo "Chrome extension manifest not found at: $EXTENSION_PATH/manifest.json" >&2
+  exit 1
+fi
+
+if [[ ! -x "$CHROME_BINARY" ]]; then
+  echo "Google Chrome was not found at: $CHROME_BINARY" >&2
+  echo "Set GOOGLE_CHROME_PATH to the Google Chrome executable and try again." >&2
+  exit 1
+fi
 
 echo "Building boringNotch…"
 xcodebuild \
@@ -57,3 +72,17 @@ fi
 
 echo "Launching $APP_PATH"
 open -n "$APP_PATH"
+
+# A dedicated profile keeps development flags and extension state isolated from
+# the user's normal Chrome profile. Reusing it also avoids first-run setup on
+# every app rebuild.
+mkdir -p "$CHROME_PROFILE_PATH"
+
+echo "Launching Google Chrome with the unpacked discussion extension…"
+"$CHROME_BINARY" \
+  --user-data-dir="$CHROME_PROFILE_PATH" \
+  --load-extension="$EXTENSION_PATH" \
+  --no-first-run \
+  --no-default-browser-check \
+  "https://www.youtube.com/" \
+  >/dev/null 2>&1 &
