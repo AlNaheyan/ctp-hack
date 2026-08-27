@@ -1,0 +1,14 @@
+{
+  "name": "@boring-notch/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Manifest V3 Chrome extension skeleton for YouTube playback observation.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
