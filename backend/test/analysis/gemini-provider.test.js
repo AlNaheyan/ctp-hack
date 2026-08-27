@@ -19,7 +19,7 @@ const okResponse = (text) => ({
   async json() {
     return {
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
-      modelVersion: 'gemini-2.5-flash-001',
+      modelVersion: 'gemini-3.6-flash-001',
       usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 45 }
     };
   }
@@ -69,7 +69,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
   assert.equal(body.generationConfig.responseSchema.type, 'OBJECT');
 
   assert.equal(result.text, '{"findings":[]}');
-  assert.equal(result.modelId, 'gemini-2.5-flash-001');
+  assert.equal(result.modelId, 'gemini-3.6-flash-001');
   assert.deepEqual(result.usage, { promptTokens: 120, responseTokens: 45 });
 });
 

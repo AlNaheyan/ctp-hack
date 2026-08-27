@@ -5,6 +5,7 @@ import {
   YouTubeCaptionProvider,
   extractInitialPlayerResponse,
   json3Cues,
+  parseTimedText,
   selectCaptionTrack
 } from '../src/transcript/youtube-provider.js';
 
@@ -57,6 +58,14 @@ test('converts JSON3 events into provider-neutral cues', () => {
   );
 });
 
+test('converts timed-text XML into provider-neutral cues', () => {
+  assert.deepEqual(
+    parseTimedText('<transcript><text start="1.2" dur="0.75">Hello &amp; goodbye</text></transcript>'),
+    [{ startMs: 1200, durationMs: 750, text: 'Hello & goodbye' }]
+  );
+  assert.equal(parseTimedText('not captions'), null);
+});
+
 test('fetches the selected caption track through the provider boundary', async () => {
   const calls = [];
   const provider = new YouTubeCaptionProvider({
@@ -79,34 +88,21 @@ test('fetches the selected caption track through the provider boundary', async (
   assert.match(calls[1], /fmt=json3/);
 });
 
-test('falls back to yt-dlp when the advertised caption response is empty', async () => {
-  const fallbackCalls = [];
-  const fallbackResult = {
-    videoId: VIDEO_ID,
-    language: 'en',
-    captionSource: 'automatic',
-    cues: [{ startMs: 1000, durationMs: 750, text: 'Fallback caption' }]
-  };
-  let calls = 0;
+test('falls back to timed-text XML when JSON3 is unreadable', async () => {
+  const calls = [];
   const provider = new YouTubeCaptionProvider({
-    fetchImpl: async () => {
-      calls += 1;
-      if (calls === 1) return new Response(watchPage(player({ tracks: [track('en', 'asr')] })));
-      return new Response('', { headers: { 'content-type': 'text/html' } });
-    },
-    ytDlpFallback: async (request) => {
-      fallbackCalls.push(request);
-      return fallbackResult;
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (calls.length === 1) return new Response(watchPage(player({ tracks: [track('en')] })));
+      if (calls.length === 2) return new Response('');
+      return new Response('<transcript><text start="1" dur="0.5">Fallback works</text></transcript>');
     }
   });
 
-  assert.deepEqual(
-    await provider.fetchTranscript({ videoId: VIDEO_ID, language: 'en-US' }),
-    fallbackResult
-  );
-  assert.equal(fallbackCalls.length, 1);
-  assert.equal(fallbackCalls[0].language, 'en');
-  assert.equal(fallbackCalls[0].captionSource, 'automatic');
+  const result = await provider.fetchTranscript({ videoId: VIDEO_ID, language: 'en-US' });
+  assert.deepEqual(result.cues, [{ startMs: 1000, durationMs: 500, text: 'Fallback works' }]);
+  assert.match(calls[1], /fmt=json3/);
+  assert.doesNotMatch(calls[2], /fmt=json3/);
 });
 
 test('maps private, deleted, captions-disabled, and unsupported-language videos', async () => {

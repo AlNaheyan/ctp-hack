@@ -2,6 +2,7 @@ export { MemoryTranscriptCache, TRANSCRIPT_CACHE_TTL_MS, buildTranscriptCacheKey
 export { cleanCaptionText, normalizeTranscript } from './normalizer.js';
 export { createTranscriptService, preferredCacheKeys } from './service.js';
 export { extractVideoId, requireVideoId } from './video-url.js';
+export { YtDlpCaptionProvider, preferredLanguages, selectCaptionFile } from './yt-dlp-provider.js';
 export {
   YouTubeCaptionProvider,
   extractInitialPlayerResponse,

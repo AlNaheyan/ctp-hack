@@ -153,13 +153,13 @@ test('concurrent requests for different videos are not coalesced together', asyn
 });
 
 test('the cache key covers video, language, schema, model, prompt, and taxonomy', () => {
-  const key = buildCacheKey({ videoId: VIDEO_ID, language: 'en-US', modelId: 'gemini-2.5-flash' });
+  const key = buildCacheKey({ videoId: VIDEO_ID, language: 'en-US', modelId: 'gemini-3.6-flash' });
   const parts = key.split('|');
 
   assert.equal(parts[0], VIDEO_ID);
   assert.equal(parts[1], 'en-us', 'language is normalized');
   assert.equal(parts[2], 'schema1');
-  assert.equal(parts[3], 'gemini-2.5-flash');
+  assert.equal(parts[3], 'gemini-3.6-flash');
   assert.equal(parts.length, 6, 'plus prompt and taxonomy versions');
 });
 

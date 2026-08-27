@@ -8,7 +8,8 @@ APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/boringNotch.app"
 APP_PROCESS="boringNotch"
 EXTENSION_PATH="$SCRIPT_DIR/extension"
 API_PORT="${PORT:-3000}"
-API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://127.0.0.1:$API_PORT}"
+API_HOST="${DISCUSSION_API_HOST:-127.0.0.1}"
+API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://$API_HOST:$API_PORT}"
 BACKEND_HEALTH_URL="$API_BASE_URL/healthz"
 BACKEND_LOG_PATH="$SCRIPT_DIR/.build/analysis-api.log"
 BACKEND_PID_PATH="$SCRIPT_DIR/.build/analysis-api.pid"
@@ -65,9 +66,8 @@ stop_backend() {
   fi
 }
 
-if ! command -v node >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v yt-dlp >/dev/null 2>&1; then
-  echo "Node.js 20.10+, curl, and yt-dlp are required to start the analysis API." >&2
-  echo "Install yt-dlp on macOS with: brew install yt-dlp" >&2
+if ! command -v node >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v "${YT_DLP_PATH:-yt-dlp}" >/dev/null 2>&1; then
+  echo "Node.js 20.10+, curl, and yt-dlp are required to run the live analysis stack." >&2
   exit 1
 fi
 
@@ -95,7 +95,7 @@ fi
 : > "$BACKEND_LOG_PATH"
 
 echo "Starting the analysis API at ${API_BASE_URL}..."
-nohup env PORT="$API_PORT" node "$SCRIPT_DIR/backend/src/index.js" >"$BACKEND_LOG_PATH" 2>&1 &
+nohup env HOST="$API_HOST" PORT="$API_PORT" node "$SCRIPT_DIR/backend/src/index.js" >"$BACKEND_LOG_PATH" 2>&1 &
 backend_pid=$!
 printf '%s\n' "$backend_pid" > "$BACKEND_PID_PATH"
 

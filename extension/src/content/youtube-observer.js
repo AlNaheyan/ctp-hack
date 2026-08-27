@@ -73,24 +73,19 @@
   }
 
   function deliver(message, attempt = 0) {
-    // Reloading an unpacked extension invalidates content scripts already in
-    // open tabs. They cannot reconnect; only a page refresh injects the new
-    // context, so stop this stale observer without polluting extension errors.
-    if (!chrome.runtime?.id) {
-      disposeInvalidatedContext();
-      return;
-    }
-
+    if (disposed) return;
     try {
       chrome.runtime.sendMessage(message, () => {
         let failed;
         try {
           failed = Boolean(chrome.runtime.lastError);
         } catch {
-          disposeInvalidatedContext();
+          // Reloading an unpacked extension invalidates scripts already living
+          // in open tabs. Stop their polling until Chrome injects the new script
+          // after the tab itself is reloaded.
+          controller.dispose();
           return;
         }
-
         if (failed && attempt === 0 && !disposed) {
           // sendMessage wakes an MV3 worker. One bounded retry covers the short
           // startup/reload window without creating a permanent polling loop.
@@ -98,7 +93,7 @@
         }
       });
     } catch {
-      disposeInvalidatedContext();
+      controller.dispose();
     }
   }
 
