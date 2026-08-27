@@ -37,7 +37,8 @@ const DEFAULTS = Object.freeze({
   HOST: '127.0.0.1',
   LOG_LEVEL: 'info',
   MOCK_LATENCY_MS: '0',
-  MOCK_SCENARIO: 'ok'
+  MOCK_SCENARIO: 'ok',
+  ANALYSIS_TIMEOUT_MS: '30000'
 });
 
 /** Secrets that live mode needs, with the reason shown when one is missing. */
@@ -103,7 +104,11 @@ export function loadConfig(env = process.env) {
     logLevel: String(read('LOG_LEVEL')).toLowerCase(),
     fixturesDir,
     mockLatencyMs: parseInteger(read('MOCK_LATENCY_MS'), 'MOCK_LATENCY_MS', { min: 0, max: 60000 }),
-    mockScenario: scenario
+    mockScenario: scenario,
+    // Analysis pipeline (W2-T2). The model default lives with the Gemini
+    // adapter; an empty GEMINI_MODEL means "use the adapter default".
+    geminiModel: env.GEMINI_MODEL === undefined || env.GEMINI_MODEL === '' ? undefined : String(env.GEMINI_MODEL),
+    analysisTimeoutMs: parseInteger(read('ANALYSIS_TIMEOUT_MS'), 'ANALYSIS_TIMEOUT_MS', { min: 1000, max: 300000 })
   });
 }
 
@@ -173,6 +178,8 @@ export function describeConfig(config, env = process.env) {
     `log level      ${config.logLevel}`,
     `mock scenario  ${config.mockScenario}`,
     `mock latency   ${config.mockLatencyMs} ms`,
+    `analyzer       ${config.mode === 'live' ? `gemini (${config.geminiModel ?? 'adapter default'})` : 'stub rules (offline)'}`,
+    `model timeout  ${config.analysisTimeoutMs} ms`,
     ...describeSecrets(env).map((secret) => `${secret.name.padEnd(14)} ${secret.status}`)
   ];
 }

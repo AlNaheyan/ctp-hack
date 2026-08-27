@@ -15,6 +15,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "mock": "node backend/src/mock/server.js",
+    "analyze": "node backend/src/analysis/cli.js",
     "test": "node --test",
     "test:backend": "cd backend && node --test",
     "test:extension": "cd extension && node --test",
