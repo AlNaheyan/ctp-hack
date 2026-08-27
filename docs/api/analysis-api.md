@@ -96,7 +96,7 @@ Contains no secrets and no cache keys.
   "analyzer": {
     "provider": "stub",
     "model": "stub-rules-1.0.0",
-    "promptVersion": "argument-analysis-1.0.0",
+    "promptVersion": "argument-analysis-2.0.0",
     "taxonomyVersion": "1.0.0",
     "schemaVersion": 1
   },
