@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var isHovering = false
 
     private let contentHorizontalInset: CGFloat = 32
-    private let contentBottomInset: CGFloat = 24
 
     private let interactionSpring = Animation.interactiveSpring(
         response: 0.54,
@@ -41,7 +40,6 @@ struct ContentView: View {
                         NotchHomeView(model: discussion)
                             .padding(.top, 8)
                             .padding(.horizontal, contentHorizontalInset)
-                            .padding(.bottom, contentBottomInset)
                     }
                 } else {
                     Color.clear
