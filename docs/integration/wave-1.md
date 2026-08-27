@@ -14,7 +14,7 @@
 | W1-T2 contracts | `origin/work/w1-t2-contracts-fixtures` at `7a604e3` | merge `09abc73` | Canonical contracts and fixture manifest |
 | W1-T4 developer stack | `origin/work/w1-t4-developer-stack` feature commit `f7ba926` | cherry-pick `facdb50` | Cherry-picked to exclude an accidental merge parent containing the full upstream history |
 | Cross-package adapters | integration branch | `a59b13d` | Reconciled fixture discovery, validation, mock errors, tests, and docs |
-| W1-T3 UX state machine | completed on integration branch | `2377f60` | State model, wireframes, precedence, accessibility, error copy, and handoff |
+| W1-T3 UX state machine | `origin/main` PR #6 feature commit `ff35532` | merge/reconciliation `5593177` | Contributor state model and separate wireframes retained; type and error mappings aligned to the closed v1 contracts |
 | Extension runtime verification | completed on integration branch | `44bc88c` | Chrome-like content-script execution for injection and playback events |
 
 ## Merge order
@@ -23,8 +23,8 @@
 2. W1-T2 contracts and fixtures.
 3. W1-T4 feature patch without its polluted ancestry.
 4. Cross-package adapter commit.
-5. W1-T3 UX specification.
-6. Extension runtime verification.
+5. Interim W1-T3 UX specification and extension runtime verification.
+6. Contributor W1-T3 package from PR #6, reconciled as the accepted source of truth.
 
 ## Adapter decisions
 
@@ -33,6 +33,10 @@
 - T4's provisional duplicate analysis/playback fixture tree and structural validator were removed.
 - `npm run validate:fixtures` and the smoke suite call W1-T2's canonical validator.
 - Backend error responses use W1-T2's closed v1 error-code enum. Mock-specific conditions map to canonical codes.
+- W1-T3's contributor specification supersedes the interim integration draft. Its
+  richer timing, accessibility, collision, and wireframe decisions were retained;
+  its provisional insight types and optional-speaker wording were corrected to
+  match the accepted W1-T2 schemas.
 - T4 was cherry-picked because merging its branch would have restored 1,265 upstream commits that the fork intentionally removed.
 
 ## Automated checks
@@ -40,7 +44,7 @@
 | Check | Result |
 | --- | --- |
 | `npm test` | PASS — 53/53 tests |
-| `npm run lint` | PASS — 24 JavaScript files, 15 JSON files, 248 files scanned for credentials |
+| `npm run lint` | PASS — 24 JavaScript files, 15 JSON files, 249 files scanned for credentials |
 | `npm run validate:fixtures` | PASS — 11/11 valid and expected-invalid fixtures |
 | `npm run smoke` | PASS — 11/11 checks, including real loopback HTTP round trips |
 | `git diff --check` | PASS |
