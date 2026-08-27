@@ -6,8 +6,8 @@ import { test } from 'node:test';
 
 import { DEFAULT_GEMINI_MODEL, createGeminiProvider, toGeminiSchema } from '../../src/analysis/providers/gemini.js';
 
-test('uses Gemini 3.6 Flash by default', () => {
-  assert.equal(DEFAULT_GEMINI_MODEL, 'gemini-3.6-flash');
+test('uses Gemini 3.5 Flash-Lite by default', () => {
+  assert.equal(DEFAULT_GEMINI_MODEL, 'gemini-3.5-flash-lite');
 });
 import { RESPONSE_SCHEMA } from '../../src/analysis/prompt.js';
 
@@ -19,7 +19,7 @@ const okResponse = (text) => ({
   async json() {
     return {
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
-      modelVersion: 'gemini-3.6-flash-001',
+      modelVersion: 'gemini-3.5-flash-lite',
       usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 45 }
     };
   }
@@ -58,7 +58,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
 
   const result = await provider.generate(request);
 
-  assert.match(seen.url, /models\/gemini-3\.6-flash:generateContent$/);
+  assert.match(seen.url, /models\/gemini-3\.5-flash-lite:generateContent$/);
   assert.equal(seen.init.headers['x-goog-api-key'], FAKE_KEY);
   assert.equal(seen.url.includes(FAKE_KEY), false, 'the key never lands in the URL');
 
@@ -69,7 +69,7 @@ test('the request carries the key as a header and asks for structured JSON', asy
   assert.equal(body.generationConfig.responseSchema.type, 'OBJECT');
 
   assert.equal(result.text, '{"findings":[]}');
-  assert.equal(result.modelId, 'gemini-3.6-flash-001');
+  assert.equal(result.modelId, 'gemini-3.5-flash-lite');
   assert.deepEqual(result.usage, { promptTokens: 120, responseTokens: 45 });
 });
 

@@ -199,7 +199,7 @@ curl -X POST http://127.0.0.1:8787/v1/analyze \
 | `ANALYSIS_TIMEOUT_MS` | `30000` | Per model request deadline |
 | `API_REQUEST_TIMEOUT_MS` | `90000` | Whole cold request deadline |
 | `ANALYSIS_CACHE_TTL_MS` | `86400000` | Result reuse window (24 h) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.6-flash` | Live mode only |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.5-flash-lite` | Live mode only |
 
 ## Not in scope here
 
