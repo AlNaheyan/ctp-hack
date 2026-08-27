@@ -194,6 +194,13 @@ class BoringViewModel: NSObject, ObservableObject {
         self.notchState = .open
     }
 
+    func resizeOpenNotch(to height: CGFloat) {
+        guard notchState == .open else { return }
+        let boundedHeight = min(max(height, openNotchSize.height), maximumOpenNotchHeight)
+        guard abs(notchSize.height - boundedHeight) > 0.5 else { return }
+        notchSize = CGSize(width: openNotchSize.width, height: boundedHeight)
+    }
+
     func close() {
         // Do not close while a share picker or sharing service is active
         if SharingStateManager.shared.preventNotchClose {

@@ -219,6 +219,7 @@ private actor EphemeralDiscussionCacheStorage: DiscussionCacheStorage {
 struct NotchHomeView: View {
     @ObservedObject var model: DiscussionSessionModel
     @ObservedObject var presentation: DiscussionPresentationModel = .shared
+    var onInsightHeightChange: (CGFloat) -> Void = { _ in }
     @FocusState private var linkFocused: Bool
 
     var body: some View {
@@ -232,7 +233,8 @@ struct NotchHomeView: View {
                     waitingCount: presentation.waitingCount,
                     onOpen: presentation.openActiveEvent,
                     onDismiss: presentation.dismiss,
-                    onHover: presentation.setHovered
+                    onHover: presentation.setHovered,
+                    onPreferredHeightChange: onInsightHeightChange
                 )
                 .id(event.id)
             } else {
