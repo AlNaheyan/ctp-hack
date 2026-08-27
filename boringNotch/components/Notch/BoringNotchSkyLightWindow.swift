@@ -59,6 +59,7 @@ class BoringNotchSkyLightWindow: NSPanel {
         backgroundColor = .clear
         isMovable = false
         becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         level = .mainMenu + 3
         hasShadow = false
         isReleasedWhenClosed = false

@@ -21,6 +21,11 @@ struct ContentView: View {
         dampingFraction: 0.8,
         blendDuration: 0
     )
+    private let closeSpring = Animation.spring(
+        response: 0.62,
+        dampingFraction: 1.0,
+        blendDuration: 0
+    )
 
     private var notchShape: NotchShape {
         NotchShape(
@@ -59,7 +64,7 @@ struct ContentView: View {
             .animation(
                 vm.notchState == .open
                     ? .spring(response: 0.56, dampingFraction: 0.8, blendDuration: 0)
-                    : .spring(response: 0.62, dampingFraction: 1.0, blendDuration: 0),
+                    : closeSpring,
                 value: vm.notchState
             )
         }
@@ -99,7 +104,7 @@ struct ContentView: View {
         closeTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
             guard !Task.isCancelled, !isHovering else { return }
-            vm.close()
+            withAnimation(closeSpring) { vm.close() }
         }
     }
 }

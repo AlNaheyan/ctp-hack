@@ -28,6 +28,7 @@ class BoringNotchWindow: NSPanel {
         backgroundColor = .clear
         isMovable = false
         becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         
         collectionBehavior = [
             .fullScreenAuxiliary,
