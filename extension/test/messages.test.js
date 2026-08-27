@@ -33,7 +33,7 @@ test('creates an envelope that matches the shared playback contract', () => {
 
 test('the checked-in playback fixture validates', () => {
   const fixture = JSON.parse(
-    readFileSync(resolve(repoRoot, 'fixtures/playback/valid/playback-state.json'), 'utf8')
+    readFileSync(resolve(repoRoot, 'fixtures/valid/playback-message.json'), 'utf8')
   );
   assert.deepEqual(validatePlaybackMessage(fixture), { valid: true, errors: [] });
 });

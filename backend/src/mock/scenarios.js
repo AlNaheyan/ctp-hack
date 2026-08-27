@@ -14,7 +14,7 @@ export const SCENARIO_DESCRIPTIONS = {
   ok: 'Return the golden analysis fixture.',
   processing: '202 with a retry hint, for the submitting/processing UI states.',
   no_transcript: '422 TRANSCRIPT_UNAVAILABLE, for the no-transcript state.',
-  rate_limited: '429 RATE_LIMITED with a retry hint.',
+  rate_limited: '429 ANALYSIS_FAILED with a retry hint.',
   backend_error: '502 ANALYSIS_FAILED, for the backend-error state.',
   upstream_timeout: '504 UPSTREAM_TIMEOUT, for the offline/timeout state.'
 };
@@ -89,7 +89,9 @@ export function applyScenario(scenario, videoId) {
         'This video has no usable captions. Try another video or a different caption language.'
       );
     case 'rate_limited':
-      throw new AppError('RATE_LIMITED', 'Too many analysis requests. Retry in a few seconds.');
+      throw new AppError('ANALYSIS_FAILED', 'Too many analysis requests. Retry in a few seconds.', {
+        status: 429
+      });
     case 'backend_error':
       throw new AppError('ANALYSIS_FAILED', 'The analysis provider returned an unusable response.');
     case 'upstream_timeout':

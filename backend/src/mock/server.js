@@ -55,7 +55,9 @@ async function readJsonBody(request) {
   for await (const chunk of request) {
     size += chunk.length;
     if (size > MAX_BODY_BYTES) {
-      throw new AppError('PAYLOAD_TOO_LARGE', `Request body exceeds ${MAX_BODY_BYTES} bytes.`);
+      throw new AppError('INVALID_REQUEST', `Request body exceeds ${MAX_BODY_BYTES} bytes.`, {
+        status: 413
+      });
     }
     chunks.push(chunk);
   }
@@ -191,8 +193,9 @@ export function createMockServer({ config = loadConfig(), logger } = {}) {
       }
 
       throw new AppError(
-        'NOT_FOUND',
-        `No route for ${request.method} ${url.pathname}. Try GET /healthz, GET /v1/fixtures, GET /v1/analysis/:videoId, or POST /v1/analyze.`
+        'INVALID_REQUEST',
+        `No route for ${request.method} ${url.pathname}. Try GET /healthz, GET /v1/fixtures, GET /v1/analysis/:videoId, or POST /v1/analyze.`,
+        { status: 404 }
       );
     })().catch(fail);
   });
@@ -249,7 +252,7 @@ async function main() {
       '',
       `  curl ${started.url}/healthz`,
       `  curl -X POST ${started.url}/v1/analyze -H "content-type: application/json" \\`,
-      '       -d \'{"url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}\'',
+      '       -d \'{"url":"https://www.youtube.com/watch?v=demoTalk001"}\'',
       '',
       '  Ctrl+C to stop.',
       ''

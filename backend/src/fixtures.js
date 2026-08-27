@@ -3,11 +3,32 @@
 // W1-T2 owns fixture content and schema validation. This module only locates
 // and parses files - it never keeps a second copy of one.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { ANALYSIS_FIXTURE_DIRS, analysisFixtureRelativePaths } from './config.js';
+import { FIXTURE_MANIFEST_RELATIVE_PATH } from './config.js';
 import { AppError } from './errors.js';
+
+function analysisFixtureRecords(fixturesDir) {
+  const manifestPath = resolve(fixturesDir, FIXTURE_MANIFEST_RELATIVE_PATH);
+  if (!existsSync(manifestPath)) return [];
+
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    if (!Array.isArray(manifest.fixtures)) return [];
+
+    return manifest.fixtures
+      .filter((entry) => entry.contract === 'analysis' && entry.valid === true)
+      .flatMap((entry) => {
+        const path = resolve(fixturesDir, entry.path);
+        if (!existsSync(path)) return [];
+        const payload = JSON.parse(readFileSync(path, 'utf8'));
+        return typeof payload.videoId === 'string' ? [{ path, payload }] : [];
+      });
+  } catch (cause) {
+    throw new AppError('INTERNAL_ERROR', `Fixture manifest ${manifestPath} is not valid.`, { cause });
+  }
+}
 
 /**
  * Video ids the mock can serve right now.
@@ -15,20 +36,7 @@ import { AppError } from './errors.js';
  * @returns {string[]} sorted, de-duplicated ids
  */
 export function listAnalysisFixtureIds(fixturesDir) {
-  const ids = new Set();
-
-  for (const relativeDir of ANALYSIS_FIXTURE_DIRS) {
-    const directory = resolve(fixturesDir, relativeDir);
-    if (!existsSync(directory)) continue;
-
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
-      if (entry.name === 'README.json') continue;
-      ids.add(entry.name.replace(/^analysis-/, '').replace(/\.json$/, ''));
-    }
-  }
-
-  return [...ids].sort();
+  return [...new Set(analysisFixtureRecords(fixturesDir).map(({ payload }) => payload.videoId))].sort();
 }
 
 /**
@@ -38,11 +46,7 @@ export function listAnalysisFixtureIds(fixturesDir) {
  * @returns {string | null}
  */
 export function findAnalysisFixturePath(videoId, fixturesDir) {
-  for (const relativePath of analysisFixtureRelativePaths(videoId)) {
-    const candidate = resolve(fixturesDir, relativePath);
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
+  return analysisFixtureRecords(fixturesDir).find(({ payload }) => payload.videoId === videoId)?.path ?? null;
 }
 
 /**
@@ -57,13 +61,13 @@ export function loadAnalysisFixture(videoId, fixturesDir) {
   if (path === null) {
     const available = listAnalysisFixtureIds(fixturesDir);
     throw new AppError(
-      'MOCK_FIXTURE_MISSING',
-      `No analysis fixture for video "${videoId}". Add ${analysisFixtureRelativePaths(videoId)[0]} under the canonical fixtures directory, or request one of the available ids.`,
+      'VIDEO_NOT_FOUND',
+      `No analysis fixture for video "${videoId}". Add a valid analysis entry to ${FIXTURE_MANIFEST_RELATIVE_PATH}, or request one of the available ids.`,
       {
         details: {
           fixturesDir,
           availableVideoIds: available,
-          expectedPath: analysisFixtureRelativePaths(videoId)[0]
+          fixtureManifest: resolve(fixturesDir, FIXTURE_MANIFEST_RELATIVE_PATH)
         }
       }
     );
@@ -72,6 +76,6 @@ export function loadAnalysisFixture(videoId, fixturesDir) {
   try {
     return { path, payload: JSON.parse(readFileSync(path, 'utf8')) };
   } catch (cause) {
-    throw new AppError('INTERNAL', `Fixture ${path} is not valid JSON.`, { cause });
+    throw new AppError('INTERNAL_ERROR', `Fixture ${path} is not valid JSON.`, { cause });
   }
 }

@@ -5,7 +5,7 @@ import { loadConfig } from '../src/config.js';
 import { createLogger } from '../src/logger.js';
 import { startMockServer } from '../src/mock/server.js';
 
-const DEMO_VIDEO_ID = 'dQw4w9WgXcQ';
+const DEMO_VIDEO_ID = 'demoTalk001';
 const DEMO_URL = `https://www.youtube.com/watch?v=${DEMO_VIDEO_ID}`;
 
 let mock;
@@ -88,16 +88,16 @@ test('a non-YouTube host is rejected with a typed error', async () => {
 
   assert.equal(response.status, 400);
   assert.equal(body.schemaVersion, 1);
-  assert.equal(body.error.code, 'UNSUPPORTED_HOST');
+  assert.equal(body.error.code, 'INVALID_YOUTUBE_URL');
   assert.equal(body.error.retryable, false);
 });
 
-test('an unreadable URL is rejected with INVALID_URL', async () => {
+test('an unreadable URL is rejected with INVALID_YOUTUBE_URL', async () => {
   const response = await post('/v1/analyze', { url: 'https://www.youtube.com/feed/subscriptions' });
   const body = await response.json();
 
   assert.equal(response.status, 400);
-  assert.equal(body.error.code, 'INVALID_URL');
+  assert.equal(body.error.code, 'INVALID_YOUTUBE_URL');
 });
 
 test('a missing fixture returns a mock-specific typed error', async () => {
@@ -105,14 +105,14 @@ test('a missing fixture returns a mock-specific typed error', async () => {
   const body = await response.json();
 
   assert.equal(response.status, 404);
-  assert.equal(body.error.code, 'MOCK_FIXTURE_MISSING');
+  assert.equal(body.error.code, 'VIDEO_NOT_FOUND');
   assert.ok(body.error.details.availableVideoIds.includes(DEMO_VIDEO_ID));
 });
 
 test('failure scenarios are reproducible per request', async () => {
   const cases = [
     ['no_transcript', 422, 'TRANSCRIPT_UNAVAILABLE', false],
-    ['rate_limited', 429, 'RATE_LIMITED', true],
+    ['rate_limited', 429, 'ANALYSIS_FAILED', true],
     ['backend_error', 502, 'ANALYSIS_FAILED', true],
     ['upstream_timeout', 504, 'UPSTREAM_TIMEOUT', true]
   ];
@@ -182,7 +182,7 @@ test('an oversized body is rejected', async () => {
   const body = await response.json();
 
   assert.equal(response.status, 413);
-  assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
+  assert.equal(body.error.code, 'INVALID_REQUEST');
 });
 
 test('unknown routes explain what exists', async () => {
@@ -190,7 +190,7 @@ test('unknown routes explain what exists', async () => {
   const body = await response.json();
 
   assert.equal(response.status, 404);
-  assert.equal(body.error.code, 'NOT_FOUND');
+  assert.equal(body.error.code, 'INVALID_REQUEST');
   assert.match(body.error.message, /\/healthz/);
 });
 

@@ -18,7 +18,7 @@ import { createLogger } from '../backend/src/logger.js';
 import { startMockServer } from '../backend/src/mock/server.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEMO_VIDEO_ID = 'dQw4w9WgXcQ';
+const DEMO_VIDEO_ID = 'demoTalk001';
 
 const steps = [];
 
@@ -35,15 +35,6 @@ function runNode(name, args) {
     process.stdout.write(`${(result.stdout ?? '').trim()}\n${(result.stderr ?? '').trim()}\n`);
   }
   return record(name, ok, ok ? '' : `exit ${result.status}`);
-}
-
-function hasRootScript(scriptName) {
-  try {
-    const pkg = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
-    return Boolean(pkg.scripts?.[scriptName]);
-  } catch {
-    return false;
-  }
 }
 
 function runNpmScript(name, scriptName) {
@@ -113,7 +104,7 @@ async function checkMockApi() {
     const badUrlBody = await badUrl.json();
     record(
       'mock API rejects a non-YouTube URL',
-      badUrl.status === 400 && ['UNSUPPORTED_HOST', 'INVALID_URL'].includes(badUrlBody.error?.code),
+      badUrl.status === 400 && badUrlBody.error?.code === 'INVALID_YOUTUBE_URL',
       `${badUrl.status} ${badUrlBody.error?.code ?? '?'}`
     );
   } finally {
@@ -126,11 +117,7 @@ process.stdout.write('\nW1-T4 smoke check\n\n');
 runNode('lint', [resolve(repoRoot, 'scripts/lint.mjs')]);
 runNode('unit tests', ['--test']);
 
-if (hasRootScript('validate:fixtures')) {
-  runNpmScript('fixture validation (W1-T2)', 'validate:fixtures');
-} else {
-  runNode('fixture structural check', [resolve(repoRoot, 'scripts/check-fixtures.mjs')]);
-}
+runNpmScript('fixture validation (W1-T2)', 'validate:fixtures');
 
 record('extension manifest present', existsSync(resolve(repoRoot, 'extension/manifest.json')));
 record('.env.example present', existsSync(resolve(repoRoot, '.env.example')));

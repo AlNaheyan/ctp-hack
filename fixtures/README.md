@@ -1,55 +1,52 @@
-# Fixtures
+# Canonical Fixtures
 
-This is the **canonical** fixture location for every lane. Nothing in the repo
-keeps a second copy: the backend, the mock API, the extension, and the macOS app
-all read from here.
-
-## Ownership
-
-**W1-T2 owns the contents of this directory and the schemas in `contracts/`.**
-W1-T4 created the directory and two placeholder payloads only so the mock API
-and the local runbook work before W1-T2 merges.
-
-When W1-T2 lands:
-
-1. Replace the placeholders below with the golden fixtures W1-T2 defines
-   (including the invalid fixtures the mock does not need).
-2. If the layout differs from the one assumed here, edit
-   `analysisFixtureRelativePaths()` and `ANALYSIS_FIXTURE_DIRS` in
-   `backend/src/config.js`. That is the only place the paths are hard-coded.
-3. Delete anything below that W1-T2 supersedes. Do not keep both.
+W1-T2 owns this directory and the schemas in `contracts/`. Backend, extension, and macOS consumers must reference these files rather than maintaining component-specific copies.
 
 ## Layout
 
 ```text
 fixtures/
-  analysis/valid/<videoId>.json   analysis payloads served by the mock API
-  playback/valid/*.json           playback message samples for extension tests
+  manifest.json                 fixture registry and expected validation result
+  valid/                        golden analysis, transcript, playback, and error payloads
+  invalid/                      one focused contract violation per payload
 ```
 
-The mock API serves `analysis/valid/<videoId>.json` by video id, so adding a new
-demo video is a matter of dropping in one file:
+`manifest.json` is the source of truth for fixture paths and contract types. The mock backend discovers valid analysis fixtures through the manifest and matches requests using the payload's `videoId`; filenames are not video identifiers.
+
+## Validate
+
+From the repository root:
 
 ```bash
-cp fixtures/analysis/valid/dQw4w9WgXcQ.json fixtures/analysis/valid/<newVideoId>.json
-curl http://127.0.0.1:8787/v1/fixtures
+npm run validate:fixtures
 ```
 
-## Placeholders currently in tree
+This runs `contracts/validate-fixtures.mjs` without packages, network access, YouTube, or Gemini. It verifies the four valid payloads and confirms each negative fixture fails for its declared reason.
 
-| Path | Purpose | Replaced by |
-| --- | --- | --- |
-| `analysis/valid/dQw4w9WgXcQ.json` | Golden analysis timeline: 2 speakers, 5 events, 5 insight types, sorted by `triggerTime` | W1-T2 |
-| `playback/valid/playback-state.json` | One `PLAYBACK_STATE` message matching the roadmap contract | W1-T2 |
+## Adding an analysis fixture
 
-Both follow the shapes in the
-[roadmap contract target](../docs/roadmap/README.md#shared-api-contract-target).
+1. Add a JSON payload under `fixtures/valid/` that satisfies `contracts/analysis-response.schema.json`.
+2. Add it to `fixtures/manifest.json` with `"contract": "analysis"` and `"valid": true`.
+3. Give it a unique, 11-character `videoId` and deterministic timestamps.
+4. Run `npm run validate:fixtures`, `npm test`, and `npm run smoke`.
+
+The current synthetic analysis uses `demoTalk001`. It validates URL and API plumbing but is not a claim that a real YouTube video exists under that ID.
 
 ## Rules
 
-- Fixtures are checked in and deterministic: fixed timestamps, no `now()`, no
-  network access to generate them.
-- No secrets, no personal data, no full transcripts of private material.
-- `startTime <= triggerTime <= endTime`, ids unique, events sorted, confidence in
-  `[0, 1]`. `npm run check:fixtures` enforces the structural subset of that until
-  W1-T2 ships real schema validation.
+- Keep timestamps fixed and payloads deterministic.
+- Never include credentials, private transcripts, or personal data.
+- Keep `startTime <= triggerTime <= endTime`, unique IDs, sorted events, and confidence in `[0, 1]`.
+- Treat `contracts/README.md` as the compatibility policy.
+- Do not add a second fixture tree under a component directory.
+
+## Mock scenarios
+
+The backend can wrap the valid analysis fixture in deterministic latency and failure behavior:
+
+```bash
+curl "http://127.0.0.1:8787/v1/analysis/demoTalk001?latencyMs=2000"
+curl -i "http://127.0.0.1:8787/v1/analysis/demoTalk001?scenario=no_transcript"
+```
+
+Supported scenarios are `ok`, `processing`, `no_transcript`, `rate_limited`, `backend_error`, and `upstream_timeout`.

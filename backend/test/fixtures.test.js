@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { DEFAULT_FIXTURES_DIR } from '../src/config.js';
 import { findAnalysisFixturePath, listAnalysisFixtureIds, loadAnalysisFixture } from '../src/fixtures.js';
 
-const DEMO_VIDEO_ID = 'dQw4w9WgXcQ';
+const DEMO_VIDEO_ID = 'demoTalk001';
 
 test('the canonical fixtures directory holds at least the demo video', () => {
   const ids = listAnalysisFixtureIds(DEFAULT_FIXTURES_DIR);
@@ -14,7 +14,7 @@ test('the canonical fixtures directory holds at least the demo video', () => {
 test('fixtures are read from the canonical location, never a backend copy', () => {
   const path = findAnalysisFixturePath(DEMO_VIDEO_ID, DEFAULT_FIXTURES_DIR);
   assert.ok(path !== null);
-  assert.match(path.replaceAll('\\', '/'), /\/fixtures\/analysis\/valid\/dQw4w9WgXcQ\.json$/);
+  assert.match(path.replaceAll('\\', '/'), /\/fixtures\/valid\/analysis-response\.json$/);
 });
 
 test('the demo fixture matches the shared analysis contract', () => {
@@ -40,8 +40,8 @@ test('the demo fixture matches the shared analysis contract', () => {
 
 test('a missing fixture reports where to add it and what exists', () => {
   assert.throws(() => loadAnalysisFixture('abcdefghijk', DEFAULT_FIXTURES_DIR), (error) => {
-    assert.equal(error.code, 'MOCK_FIXTURE_MISSING');
-    assert.match(error.message, /analysis\/valid\/abcdefghijk\.json/);
+    assert.equal(error.code, 'VIDEO_NOT_FOUND');
+    assert.match(error.message, /manifest\.json/);
     assert.ok(error.details.availableVideoIds.includes(DEMO_VIDEO_ID));
     return true;
   });

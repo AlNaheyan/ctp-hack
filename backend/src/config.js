@@ -18,22 +18,8 @@ export const REPO_ROOT = resolve(moduleDir, '..', '..');
  */
 export const DEFAULT_FIXTURES_DIR = resolve(REPO_ROOT, 'fixtures');
 
-/**
- * Fixture lookup order for one analysis payload, relative to the fixtures dir.
- * REBASE POINT: if W1-T2 lands a different layout, edit only this list.
- * @param {string} videoId
- * @returns {string[]}
- */
-export function analysisFixtureRelativePaths(videoId) {
-  return [
-    `analysis/valid/${videoId}.json`,
-    `analysis/${videoId}.json`,
-    `analysis/valid/analysis-${videoId}.json`
-  ];
-}
-
-/** Directory scanned to list which video ids the mock can serve. */
-export const ANALYSIS_FIXTURE_DIRS = ['analysis/valid', 'analysis'];
+/** W1-T2's manifest is the source of truth for canonical fixture paths. */
+export const FIXTURE_MANIFEST_RELATIVE_PATH = 'manifest.json';
 
 export const MODES = Object.freeze(['mock', 'live']);
 export const SCENARIOS = Object.freeze([

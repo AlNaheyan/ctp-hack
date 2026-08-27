@@ -19,7 +19,8 @@
     "test:backend": "cd backend && node --test",
     "test:extension": "cd extension && node --test",
     "lint": "node scripts/lint.mjs",
-    "check:fixtures": "node scripts/check-fixtures.mjs",
+    "validate:fixtures": "node contracts/validate-fixtures.mjs",
+    "check:fixtures": "npm run validate:fixtures",
     "smoke": "node scripts/smoke.mjs"
   }
 }

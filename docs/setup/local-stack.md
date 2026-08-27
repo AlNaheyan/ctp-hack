@@ -35,7 +35,7 @@ In a second terminal:
 curl http://127.0.0.1:8787/healthz
 curl -X POST http://127.0.0.1:8787/v1/analyze \
   -H "content-type: application/json" \
-  -d '{"url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
+  -d '{"url":"https://www.youtube.com/watch?v=demoTalk001"}'
 ```
 
 The second command returns the golden analysis fixture: `schemaVersion 1`, two
@@ -50,7 +50,7 @@ speakers, five insight events sorted by `triggerTime`.
 | `npm test` | All backend and extension unit tests (`node --test`) |
 | `npm run test:backend` / `npm run test:extension` | One lane only |
 | `npm run lint` | JS/JSON parse checks, manifest policy, repo-wide credential scan |
-| `npm run check:fixtures` | Structural fixture validation (superseded by W1-T2) |
+| `npm run validate:fixtures` | Canonical W1-T2 contract and fixture validation |
 | `npm run smoke` | Everything above plus a live round trip against the mock API |
 | `xcodebuild build -project boringNotch.xcodeproj -scheme boringNotch -configuration Debug -destination "platform=macOS" CODE_SIGNING_ALLOWED=NO` | Builds the macOS app. **W1-T1 owns the authoritative command**; run `xcodebuild -resolvePackageDependencies -project boringNotch.xcodeproj` first on a clean checkout |
 
@@ -92,11 +92,11 @@ so they can be fed straight into schema validation. Errors are typed:
 }
 ```
 
-Error codes: `INVALID_URL`, `UNSUPPORTED_HOST`, `INVALID_REQUEST`,
-`PAYLOAD_TOO_LARGE`, `NOT_FOUND`, `VIDEO_UNAVAILABLE`, `TRANSCRIPT_UNAVAILABLE`,
-`MOCK_FIXTURE_MISSING` (mock only), `RATE_LIMITED`, `ANALYSIS_FAILED`,
-`UPSTREAM_TIMEOUT`, `CONFIG_ERROR`, `INTERNAL`. They are **provisional** until
-W1-T2 publishes the canonical error contract.
+Error codes match the closed enum in `contracts/api-error.schema.json`:
+`INVALID_REQUEST`, `INVALID_YOUTUBE_URL`, `UNSUPPORTED_SCHEMA_VERSION`,
+`VIDEO_PRIVATE`, `VIDEO_NOT_FOUND`, `CAPTIONS_DISABLED`,
+`UNSUPPORTED_LANGUAGE`, `TRANSCRIPT_UNAVAILABLE`, `ANALYSIS_FAILED`,
+`UPSTREAM_TIMEOUT`, and `INTERNAL_ERROR`.
 
 ### Simulating slow and failing backends
 
@@ -105,10 +105,10 @@ and add latency with `?latencyMs=`:
 
 ```bash
 # Loading state: two seconds before a normal answer
-curl "http://127.0.0.1:8787/v1/analysis/dQw4w9WgXcQ?latencyMs=2000"
+curl "http://127.0.0.1:8787/v1/analysis/demoTalk001?latencyMs=2000"
 
 # No-transcript state
-curl -i "http://127.0.0.1:8787/v1/analysis/dQw4w9WgXcQ?scenario=no_transcript"
+curl -i "http://127.0.0.1:8787/v1/analysis/demoTalk001?scenario=no_transcript"
 ```
 
 | Scenario | Response |
@@ -116,7 +116,7 @@ curl -i "http://127.0.0.1:8787/v1/analysis/dQw4w9WgXcQ?scenario=no_transcript"
 | `ok` | 200, the golden fixture |
 | `processing` | 202 `{ status: "processing", retryAfterSeconds: 3 }` plus `Retry-After` |
 | `no_transcript` | 422 `TRANSCRIPT_UNAVAILABLE` |
-| `rate_limited` | 429 `RATE_LIMITED` |
+| `rate_limited` | 429 `ANALYSIS_FAILED` with `retryable: true` |
 | `backend_error` | 502 `ANALYSIS_FAILED` |
 | `upstream_timeout` | 504 `UPSTREAM_TIMEOUT` |
 
@@ -125,9 +125,9 @@ Every UX state in W1-T3 can be reproduced from these without touching a network.
 ## Fixtures
 
 `fixtures/` is the single canonical location, owned by W1-T2. The mock resolves
-`fixtures/analysis/valid/<videoId>.json`, so adding a demo video is one file
-copy. Nothing else in the repo keeps a second copy; if the layout changes, edit
-`analysisFixtureRelativePaths()` in `backend/src/config.js` and nothing else.
+valid analysis entries from `fixtures/manifest.json` and matches the payload's
+`videoId`. Nothing else in the repo keeps a second copy. Add new fixtures to the
+manifest rather than introducing another component-specific directory.
 See [fixtures/README.md](../../fixtures/README.md).
 
 ## Chrome extension
@@ -211,7 +211,7 @@ cannot automate:
 | Symptom | Fix |
 | --- | --- |
 | `EADDRINUSE` on start | Another mock instance is running. `PORT=8788 npm run dev`, or stop the other process |
-| `MOCK_FIXTURE_MISSING` | The video has no fixture. `GET /v1/fixtures` lists what exists; add `fixtures/analysis/valid/<videoId>.json` |
+| `VIDEO_NOT_FOUND` | The video has no fixture. `GET /v1/fixtures` lists what exists; add a valid analysis entry to `fixtures/manifest.json` |
 | `Missing required secret GEMINI_API_KEY` | You are in live mode. Set `ANALYSIS_MODE=mock` in `.env` for Wave 1 |
 | `ANALYSIS_MODE=live is not implemented yet` | Expected until W2-T1/W2-T2/W3-T1 land |
 | Extension card shows an error after editing | Press **Reload** on the card, then reload the YouTube tab |
@@ -221,22 +221,20 @@ cannot automate:
 ## Handoff to integration
 
 - **Commands:** `npm run dev`, `npm run mock`, `npm test`, `npm run lint`,
-  `npm run check:fixtures`, `npm run smoke`.
+  `npm run validate:fixtures`, `npm run smoke`.
 - **Port:** 8787 (`PORT`), bound to `127.0.0.1` (`HOST`).
 - **Environment variables introduced:** `ANALYSIS_MODE`, `PORT`, `HOST`,
   `LOG_LEVEL`, `FIXTURES_DIR`, `MOCK_LATENCY_MS`, `MOCK_SCENARIO`,
   `GEMINI_API_KEY` (live only). All documented in `.env.example`.
-- **Directories added:** `backend/`, `extension/`, `scripts/`, `fixtures/`
-  (placeholder payloads only), `docs/setup/local-stack.md`. Generated at runtime:
+- **Directories added:** `backend/`, `extension/`, `scripts/`, and
+  `docs/setup/local-stack.md`. Generated at runtime:
   `node_modules/` and `.env`, both git-ignored.
 - **Mocked boundaries:** the analysis HTTP API (W3-T1 replaces it), the playback
   transport (W2-T3 uses the mock transport, W3-T2 replaces it), and the fixture
   corpus (W1-T2 replaces the placeholders).
-- **Rebase points after W1-T2 merges:** `analysisFixtureRelativePaths()` and
-  `ANALYSIS_FIXTURE_DIRS` in `backend/src/config.js`, the error codes in
-  `backend/src/errors.js`, and `scripts/check-fixtures.mjs` (delete it in favour
-  of the W1-T2 validation command, which `scripts/smoke.mjs` already prefers when
-  a root `validate:fixtures` script exists).
+- **W1-T2 integration:** the backend discovers analysis entries through
+  `fixtures/manifest.json`; the root `validate:fixtures` script and smoke check
+  run W1-T2's canonical validator.
 - **Known limitations:** the mock has no real cache or request coalescing;
   `forceRefresh` only flips the `x-analysis-cache` header. `ANALYSIS_MODE=live`
   is a stub. Extension observation is a proof of life, not the W2-T3 observer.

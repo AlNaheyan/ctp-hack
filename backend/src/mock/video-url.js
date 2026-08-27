@@ -41,7 +41,7 @@ export function extractVideoId(input) {
   const host = url.hostname.toLowerCase();
   if (!ALLOWED_HOSTS.has(host)) {
     throw new AppError(
-      'UNSUPPORTED_HOST',
+      'INVALID_YOUTUBE_URL',
       `Host "${url.hostname}" is not a YouTube watch URL. Supported hosts: ${[...ALLOWED_HOSTS].join(', ')}.`
     );
   }
@@ -65,7 +65,7 @@ export function extractVideoId(input) {
 }
 
 /**
- * Same as `extractVideoId`, but throws INVALID_URL instead of returning null.
+ * Same as `extractVideoId`, but throws INVALID_YOUTUBE_URL instead of returning null.
  * @param {unknown} input
  * @returns {string}
  */
@@ -73,7 +73,7 @@ export function requireVideoId(input) {
   const videoId = extractVideoId(input);
   if (videoId === null) {
     throw new AppError(
-      'INVALID_URL',
+      'INVALID_YOUTUBE_URL',
       'Could not read a YouTube video id. Send a watch URL such as https://www.youtube.com/watch?v=dQw4w9WgXcQ, a youtu.be link, or a bare 11-character id.'
     );
   }

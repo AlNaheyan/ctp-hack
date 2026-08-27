@@ -22,9 +22,9 @@ test('accepts the supported YouTube URL forms', () => {
   }
 });
 
-test('rejects non-YouTube hosts with UNSUPPORTED_HOST', () => {
+test('rejects non-YouTube hosts with INVALID_YOUTUBE_URL', () => {
   assert.throws(() => extractVideoId('https://vimeo.com/watch?v=dQw4w9WgXcQ'), (error) => {
-    assert.equal(error.code, 'UNSUPPORTED_HOST');
+    assert.equal(error.code, 'INVALID_YOUTUBE_URL');
     assert.equal(error.status, 400);
     return true;
   });
@@ -37,9 +37,9 @@ test('returns null for YouTube URLs without a video id', () => {
   assert.equal(extractVideoId(undefined), null);
 });
 
-test('requireVideoId throws INVALID_URL with guidance', () => {
+test('requireVideoId throws INVALID_YOUTUBE_URL with guidance', () => {
   assert.throws(() => requireVideoId('https://www.youtube.com/feed/subscriptions'), (error) => {
-    assert.equal(error.code, 'INVALID_URL');
+    assert.equal(error.code, 'INVALID_YOUTUBE_URL');
     assert.match(error.message, /watch\?v=/);
     return true;
   });

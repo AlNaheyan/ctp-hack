@@ -59,6 +59,6 @@ The success payload is the analysis JSON exactly as the roadmap defines it, so
 consumers can validate it unchanged. Error bodies are
 `{ schemaVersion, error: { code, message, retryable } }`.
 
-The codes in `errors.js` are **provisional**: W1-T2 owns the canonical error
-contract, and this file gets reconciled with `contracts/` when that merges.
-`MOCK_FIXTURE_MISSING` is mock-only and must never appear in the real API.
+The codes in `errors.js` match the closed v1 enum in
+`contracts/api-error.schema.json`. Mock-only conditions map to the closest
+canonical code; for example, a missing mock timeline is `VIDEO_NOT_FOUND`.
