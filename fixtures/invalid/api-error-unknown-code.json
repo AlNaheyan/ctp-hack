@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "error": {
+    "code": "GEMINI_QUOTA_EXHAUSTED",
+    "message": "A provider-specific code must not cross the API boundary.",
+    "retryable": true
+  }
+}

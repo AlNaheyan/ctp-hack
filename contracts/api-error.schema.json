@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://discussion-analyzer.local/contracts/v1/api-error.schema.json",
+  "title": "Typed API Error v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "error"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "error": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_REQUEST",
+            "INVALID_YOUTUBE_URL",
+            "UNSUPPORTED_SCHEMA_VERSION",
+            "VIDEO_PRIVATE",
+            "VIDEO_NOT_FOUND",
+            "CAPTIONS_DISABLED",
+            "UNSUPPORTED_LANGUAGE",
+            "TRANSCRIPT_UNAVAILABLE",
+            "ANALYSIS_FAILED",
+            "UPSTREAM_TIMEOUT",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "retryable": { "type": "boolean" },
+        "requestId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$" },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  },
+  "x-contractChecks": ["UTF-8 payload is at most 16384 bytes"]
+}

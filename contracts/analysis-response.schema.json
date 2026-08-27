@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://discussion-analyzer.local/contracts/v1/analysis-response.schema.json",
+  "title": "Discussion Analysis Response v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "videoId", "title", "generatedAt", "expiresAt", "events"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "videoId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "generatedAt": { "$ref": "#/$defs/utcTimestamp" },
+    "expiresAt": { "$ref": "#/$defs/utcTimestamp" },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "seconds": { "type": "number", "minimum": 0 },
+    "stableId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$" },
+    "event": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "startTime", "triggerTime", "endTime", "speaker", "type", "title", "summary", "confidence", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "startTime": { "$ref": "#/$defs/seconds" },
+        "triggerTime": { "$ref": "#/$defs/seconds" },
+        "endTime": { "$ref": "#/$defs/seconds" },
+        "speaker": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "type": {
+          "enum": ["unsupported_claim", "contradiction", "strawman", "evasion", "missing_premise"]
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    }
+  },
+  "x-contractChecks": [
+    "generatedAt precedes expiresAt",
+    "event IDs are unique",
+    "startTime <= triggerTime <= endTime",
+    "events sorted by triggerTime then id",
+    "UTF-8 payload is at most 1048576 bytes"
+  ]
+}
