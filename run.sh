@@ -119,6 +119,15 @@ fi
 
 echo "Analysis API ready (PID $backend_pid; log: $BACKEND_LOG_PATH)"
 
+echo "Finding the unpacked extension in the normal Chrome profile..."
+if ! extension_id=$(node "$SCRIPT_DIR/scripts/find-chrome-extension-id.mjs" "$EXTENSION_PATH"); then
+  echo "Unable to register the native messaging host." >&2
+  exit 1
+fi
+
+echo "Registering the native messaging host for extension $extension_id..."
+npm run native:register -- "$extension_id"
+
 echo "Building boringNotch..."
 xcodebuild \
   -quiet \
