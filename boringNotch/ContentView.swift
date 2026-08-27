@@ -14,8 +14,8 @@ struct ContentView: View {
     @State private var closeTask: Task<Void, Never>?
     @State private var isHovering = false
 
-    private let contentHorizontalInset: CGFloat = 24
-    private let contentBottomInset: CGFloat = 18
+    private let contentHorizontalInset: CGFloat = 32
+    private let contentBottomInset: CGFloat = 24
 
     private let interactionSpring = Animation.interactiveSpring(
         response: 0.54,
@@ -39,7 +39,7 @@ struct ContentView: View {
                             .frame(height: max(24, vm.effectiveClosedNotchHeight))
 
                         NotchHomeView(model: discussion)
-                            .padding(.top, 4)
+                            .padding(.top, 8)
                             .padding(.horizontal, contentHorizontalInset)
                             .padding(.bottom, contentBottomInset)
                     }
