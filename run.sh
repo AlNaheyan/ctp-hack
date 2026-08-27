@@ -9,6 +9,11 @@ APP_PROCESS="boringNotch"
 EXTENSION_PATH="$SCRIPT_DIR/extension"
 CHROME_PROFILE_PATH="$SCRIPT_DIR/.build/ChromeExtensionProfile"
 CHROME_BINARY="${GOOGLE_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+API_BASE_URL="${DISCUSSION_API_BASE_URL:-http://127.0.0.1:${PORT:-8787}}"
+BACKEND_HEALTH_URL="$API_BASE_URL/healthz"
+BACKEND_LOG_PATH="$SCRIPT_DIR/.build/analysis-api.log"
+
+export DISCUSSION_API_BASE_URL="$API_BASE_URL"
 
 cd "$SCRIPT_DIR"
 
@@ -21,6 +26,46 @@ if [ ! -x "$CHROME_BINARY" ]; then
   echo "Google Chrome was not found at: $CHROME_BINARY" >&2
   echo "Set GOOGLE_CHROME_PATH to the Google Chrome executable and try again." >&2
   exit 1
+fi
+
+backend_is_ready() {
+  curl --fail --silent --show-error --max-time 1 "$BACKEND_HEALTH_URL" >/dev/null 2>&1
+}
+
+if backend_is_ready; then
+  echo "Analysis API is already running at $API_BASE_URL"
+else
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "Node.js 20.10+ and npm are required to start the analysis API." >&2
+    exit 1
+  fi
+
+  mkdir -p "$SCRIPT_DIR/.build"
+  : > "$BACKEND_LOG_PATH"
+
+  echo "Starting the analysis API at $API_BASE_URL…"
+  nohup npm run dev >"$BACKEND_LOG_PATH" 2>&1 &
+  backend_pid=$!
+
+  attempts=0
+  while [ "$attempts" -lt 100 ]; do
+    if backend_is_ready; then
+      break
+    fi
+    if ! kill -0 "$backend_pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+    attempts=$((attempts + 1))
+  done
+
+  if ! backend_is_ready; then
+    echo "Analysis API failed to become ready. Recent log output:" >&2
+    tail -n 40 "$BACKEND_LOG_PATH" >&2
+    exit 1
+  fi
+
+  echo "Analysis API ready (PID $backend_pid; log: $BACKEND_LOG_PATH)"
 fi
 
 echo "Building boringNotch…"
