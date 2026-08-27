@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    { "path": "valid/analysis-response.json", "contract": "analysis", "valid": true },
+    { "path": "valid/transcript.json", "contract": "transcript", "valid": true },
+    { "path": "valid/playback-message.json", "contract": "playback", "valid": true },
+    { "path": "valid/api-error.json", "contract": "apiError", "valid": true },
+    { "path": "invalid/analysis-unsorted-events.json", "contract": "analysis", "valid": false, "expectedError": "EVENTS_NOT_SORTED" },
+    { "path": "invalid/analysis-duplicate-event-ids.json", "contract": "analysis", "valid": false, "expectedError": "DUPLICATE_ID" },
+    { "path": "invalid/analysis-bad-time-bounds.json", "contract": "analysis", "valid": false, "expectedError": "BAD_TIME_BOUNDS" },
+    { "path": "invalid/analysis-unsupported-schema-version.json", "contract": "analysis", "valid": false, "expectedError": "UNSUPPORTED_SCHEMA_VERSION" },
+    { "path": "invalid/transcript-bad-time-bounds.json", "contract": "transcript", "valid": false, "expectedError": "BAD_TIME_BOUNDS" },
+    { "path": "invalid/playback-negative-seconds.json", "contract": "playback", "valid": false, "expectedError": "INVALID_SECONDS" },
+    { "path": "invalid/api-error-unknown-code.json", "contract": "apiError", "valid": false, "expectedError": "INVALID_ENUM" }
+  ]
+}

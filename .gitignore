@@ -53,3 +53,11 @@ build/
 *.xcarchive
 *.dSYM
 
+
+# Local developer stack (W1-T4)
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.mock-api.pid

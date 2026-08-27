@@ -1,0 +1,26 @@
+{
+  "name": "boring-notch-discussion-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local developer stack for the Boring Notch discussion analyzer (W1-T4).",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "workspaces": [
+    "backend",
+    "extension"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "mock": "node backend/src/mock/server.js",
+    "test": "node --test",
+    "test:backend": "cd backend && node --test",
+    "test:extension": "cd extension && node --test",
+    "lint": "node scripts/lint.mjs",
+    "validate:fixtures": "node contracts/validate-fixtures.mjs",
+    "check:fixtures": "npm run validate:fixtures",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}

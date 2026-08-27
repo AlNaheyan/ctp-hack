@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "type": "PLAYBACK_STATE",
+  "payload": {
+    "videoId": "demoTalk001",
+    "currentTime": -0.25,
+    "duration": 642.8,
+    "paused": false,
+    "playbackRate": 1,
+    "observedAt": "2026-08-27T16:03:42.100Z"
+  }
+}

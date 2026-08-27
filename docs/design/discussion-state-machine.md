@@ -66,11 +66,13 @@ Insight types use an SF Symbol plus a text label; color is redundant:
 | `type` value | Label | Symbol | Accent |
 |---|---|---|---|
 | `unsupported_claim` | Needs support | `questionmark.bubble` | amber |
-| `counterargument` | Counterpoint | `arrow.trianglehead.branch` | cyan |
-| `agreement` | Agreement | `checkmark.bubble` | green |
-| Any other valid value | Insight | `text.bubble` | blue |
+| `contradiction` | Possible contradiction | `arrow.triangle.2.circlepath` | purple |
+| `strawman` | Position may be reframed | `person.2` | orange |
+| `evasion` | Question may be unanswered | `arrow.turn.up.right` | blue |
+| `missing_premise` | Reasoning skips a step | `link.badge.plus` | teal |
 
-Unknown types remain renderable because schema evolution must not produce a blank card.
+These are the complete v1 values. An unknown type fails contract validation before
+presentation; adding a type requires a new compatible contract decision and UI mapping.
 
 ### Confidence treatment
 
@@ -150,6 +152,18 @@ Priority, highest first: **user interaction/drag > system HUD > critical battery
 
 Retries are explicit, idempotent, and show Submitting immediately. After three consecutive backend failures, copy remains the same; the UI does not add a new workflow or settings dependency.
 
+Typed API errors map to those recovery states as follows:
+
+| v1 error code | UI state | Retry behavior |
+|---|---|---|
+| `INVALID_REQUEST`, `INVALID_YOUTUBE_URL` | Invalid URL/request | Correct or replace the URL |
+| `VIDEO_PRIVATE`, `VIDEO_NOT_FOUND`, `CAPTIONS_DISABLED`, `UNSUPPORTED_LANGUAGE`, `TRANSCRIPT_UNAVAILABLE` | No transcript / video unavailable | Try another video; offer Retry only when `retryable` is true |
+| `ANALYSIS_FAILED`, `UPSTREAM_TIMEOUT`, `INTERNAL_ERROR` | Backend error | Respect the response `retryable` value |
+| `UNSUPPORTED_SCHEMA_VERSION` | Update required | Disable Retry |
+
+Transport failures with no typed response use Offline. The server's safe `message` may
+supplement the fixed copy, but `code` and `retryable` control behavior.
+
 ## Accessibility and resilient copy
 
 - VoiceOver sees each card as a named group and announces: “Discussion insight, {type}, {title}, at {time}.” It does not automatically read transcript evidence over other audio. Actions follow in visual order.
@@ -169,8 +183,8 @@ W3-T3 may consume all fields already proposed by W1-T2:
 | response `videoId`, `title` | matching, ready state, open URL, context label |
 | event `id` | queue identity and dedupe with `videoId` |
 | `startTime`, `triggerTime`, `endTime` | open context, trigger crossing, contextual interval |
-| `speaker` | optional expanded metadata; hide the row when empty |
-| `type` | label/symbol mapping with unknown fallback |
+| `speaker` | required expanded metadata; it may be visually deprioritized when space is constrained |
+| `type` | label/symbol mapping for the closed v1 enum above |
 | `title`, `summary`, `evidence` | compact title and expanded content |
 | `confidence` | expanded qualitative confidence label |
 

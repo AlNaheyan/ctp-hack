@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Boring Notch Discussion Observer (dev)",
+  "version": "0.1.0",
+  "description": "Observes YouTube playback and forwards timestamped state to the Boring Notch discussion analyzer.",
+  "minimum_chrome_version": "116",
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["src/content/youtube-observer.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "host_permissions": ["https://www.youtube.com/*"]
+}
