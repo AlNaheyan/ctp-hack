@@ -46,7 +46,11 @@ struct ContentView: View {
                         Color.clear
                             .frame(height: max(24, vm.effectiveClosedNotchHeight))
 
-                        NotchHomeView(model: discussion, presentation: presentation)
+                        NotchHomeView(
+                            model: discussion,
+                            presentation: presentation,
+                            onInsightHeightChange: resizeForInsight
+                        )
                             .padding(.top, 8)
                             .padding(.horizontal, contentHorizontalInset)
                     }
@@ -97,6 +101,9 @@ struct ContentView: View {
             presentation.setInterrupted(interrupted)
         }
         .onChange(of: presentation.activeEvent?.id) { _, insightID in
+            if insightID == nil, vm.notchState == .open {
+                vm.resizeOpenNotch(to: openNotchSize.height)
+            }
             if insightID == nil, !isHovering {
                 scheduleClose()
             }
@@ -107,6 +114,17 @@ struct ContentView: View {
         closeTask?.cancel()
         guard vm.notchState == .closed else { return }
         withAnimation(interactionSpring) { vm.open() }
+    }
+
+    private func resizeForInsight(_ cardHeight: CGFloat) {
+        guard presentation.activeEvent != nil else { return }
+        // Closed-notch clearance, input, playback bar, and vertical spacing sit
+        // above the card. The visible notch grows downward; the host window has
+        // capacity up to maximumOpenNotchHeight.
+        let chromeHeight = max(24, vm.effectiveClosedNotchHeight) + 86
+        withAnimation(.easeInOut(duration: 0.2)) {
+            vm.resizeOpenNotch(to: chromeHeight + cardHeight)
+        }
     }
 
     private func handleHover(_ hovering: Bool) {
