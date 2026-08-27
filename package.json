@@ -22,6 +22,8 @@
     "lint": "node scripts/lint.mjs",
     "validate:fixtures": "node contracts/validate-fixtures.mjs",
     "check:fixtures": "npm run validate:fixtures",
+    "native:register": "node scripts/native-host/register.mjs",
+    "native:unregister": "node scripts/native-host/unregister.mjs",
     "smoke": "node scripts/smoke.mjs"
   }
 }

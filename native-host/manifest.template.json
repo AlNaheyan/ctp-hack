@@ -1,0 +1,9 @@
+{
+  "name": "com.ctphack.discussionnotch.bridge",
+  "description": "Boring Notch discussion playback bridge",
+  "path": "__HOST_EXECUTABLE__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__EXTENSION_ID__/"
+  ]
+}
