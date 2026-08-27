@@ -47,6 +47,7 @@ speakers, five insight events sorted by `triggerTime`.
 | --- | --- |
 | `npm run dev` | Preflight checks, then the backend in mock mode (one-command startup) |
 | `npm run mock` | The mock API alone, without the preflight banner |
+| `npm run analyze` | Analyse a transcript fixture and print the analysis JSON (offline stub; `-- --live` uses Gemini). See [backend/src/analysis/README.md](../../backend/src/analysis/README.md) |
 | `npm test` | All backend and extension unit tests (`node --test`) |
 | `npm run test:backend` / `npm run test:extension` | One lane only |
 | `npm run lint` | JS/JSON parse checks, manifest policy, repo-wide credential scan |

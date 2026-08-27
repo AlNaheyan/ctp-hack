@@ -27,15 +27,28 @@ backend/
       server.js        the mock HTTP API
       scenarios.js     latency and failure simulation
       video-url.js     mock-only URL parsing (W2-T1 supersedes it)
+    analysis/          transcript -> insight events (W2-T2), see its README
+      analyzer.js      orchestration and the public entry point
+      chunker.js       overlapping, timestamp-preserving chunks
+      prompt.js        versioned prompt and neutral response schema
+      validator.js     model-output parsing, clamping, drop reasons
+      postprocess.js   findings -> contract events, dedupe, sort
+      contract.js      validation driven by contracts/*.schema.json
+      taxonomy.js      the five MVP insight types
+      cli.js           npm run analyze
+      providers/       gemini adapter, offline stub, provider selection
   test/                node --test suites, no network
 ```
+
+The analysis package documents its own interface, versions, limits, and typed
+errors in [src/analysis/README.md](src/analysis/README.md).
 
 ## Where the real pipeline goes
 
 | Ticket | Adds |
 | --- | --- |
 | W2-T1 | Transcript ingestion service, real URL parser, transcript cache |
-| W2-T2 | Analyzer interface, Gemini adapter, prompt/chunker/validator |
+| W2-T2 | ✅ landed: `src/analysis/` — analyzer interface, Gemini adapter, prompt/chunker/validator |
 | W3-T1 | `POST /analyze` orchestration, 24 h result cache, request coalescing |
 
 Keep new work behind the interfaces already here: read configuration from
