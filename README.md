@@ -1,199 +1,257 @@
-<h1 align="center">
-  <br>
-  <a href="http://theboring.name"><img src="https://framerusercontent.com/images/RFK4vs0kn8pRMuOO58JeyoemXA.png?scale-down-to=256" alt="Boring Notch" width="150"></a>
-  <br>
-  Boring Notch
-  <br>
-</h1>
+# CounterNotch
 
+CounterNotch is a macOS discussion companion that turns the MacBook notch into
+a real-time argument analysis surface. Give it a YouTube discussion or debate,
+and it retrieves the captions, analyzes the complete transcript with Gemini,
+then displays timestamped insights as the video plays.
 
-<p align="center">
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/boring-notch"><img src="https://badges.crowdin.net/boring-notch/localized.svg"></a>
-  <img src="https://github.com/TheBoredTeam/boring.notch/actions/workflows/cicd.yml/badge.svg" alt="TheBoringNotch Build & Test" style="margin-right: 10px;" />
-  <a href="https://discord.gg/c8JXA7qrPm">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/c8JXA7qrPm?style=flat" alt="Discord Badge" />
-  </a>
-  <a href="https://www.ko-fi.com/alexander5015">
-    <img src="https://srv-cdn.himpfen.io/badges/kofi/kofi-flat.svg" alt="Ko-Fi" />
-  </a>
-</p>
+The project is built as a hackathon extension of the open-source
+[Boring Notch](https://github.com/TheBoredTeam/boring.notch) macOS app.
 
-<!--Welcome to **Boring.Notch**, the coolest way to make your MacBook's notch the star of the show! Forget about those boring status bars—our notch turns into a dynamic music control center, complete with a snazzy visualizer and all the music controls you need. It's like having a mini concert right at the top of your screen! -->
+## What it does
 
-Say hello to **Boring Notch**, the coolest way to make your MacBook’s notch the star of the show! Say goodbye to boring status bars: with Boring Notch, your notch transforms into a dynamic music control center, complete with a vibrant visualizer and all the essential music controls you need. But that’s just the start! Boring Notch also offers calendar integration, a handy file shelf with AirDrop support, a complete MacOS HUD replacement and more!
+- Accepts a public YouTube video URL from the macOS notch interface.
+- Retrieves timed captions with `yt-dlp`.
+- Sends the complete transcript to Gemini in one request, preserving context
+  across the full discussion.
+- Identifies unsupported claims, contradictions, possible strawmen, evasions,
+  and missing premises.
+- Returns grounded findings tied to real transcript segment IDs and timestamps.
+- Tracks YouTube playback through a Manifest V3 Chrome extension.
+- Displays an insight card when playback naturally reaches its trigger time.
+- Handles pausing, seeking, rewinding, video changes, event deduplication, and
+  short insight queues.
+- Caches completed analyses for 24 hours.
 
-> **Hackathon fork:** We are extending Boring Notch into a timestamp-synchronized YouTube discussion analyzer. See the [four-wave implementation roadmap](docs/roadmap/README.md).
->
-> Working on it? Start with the [local developer stack](docs/setup/local-stack.md): `cp .env.example .env && npm run dev` brings up the mock analysis API with no keys required.
+## System design
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2d5f69c1-6e7b-4bc2-a6f1-bb9e27cf88a8" alt="Demo GIF" />
-</p>
+![CounterNotch system design](docs/assets/counternotch-system-design.png)
 
-<!--https://github.com/user-attachments/assets/19b87973-4b3a-4853-b532-7e82d1d6b040-->
----
-<!--## Table of Contents
-- [Installation](#installation)
-- [Usage](#usage)
-- [Roadmap](#-roadmap)
-- [Building from Source](#building-from-source)
-- [Contributing](#-contributing)
-- [Join our Discord Server](#join-our-discord-server)
-- [Star History](#star-history)
-- [Buy us a coffee!](#buy-us-a-coffee)
-- [Acknowledgments](#-acknowledgments)-->
+The diagram shows the conceptual product flow. In the current implementation,
+the backend uses Node.js's native HTTP server rather than Express, and the
+Chrome extension sends playback state through Chrome Native Messaging rather
+than a WebSocket.
 
-## Installation
+There are two paths through the system:
 
-**System Requirements:**
-- macOS **14 Sonoma** or later
-- Apple Silicon or Intel Mac
+1. **Analysis path:** the SwiftUI app sends a YouTube URL to the local API. The
+   API retrieves and normalizes captions, sends the full transcript to Gemini,
+   validates the structured response, and returns timestamped insight events.
+2. **Playback path:** the Chrome extension observes the active YouTube player
+   and forwards its video ID, current time, paused state, duration, and playback
+   rate through a Swift native messaging host to the macOS app.
 
----
+The timeline engine combines both paths and presents an insight only when the
+matching video naturally crosses that insight's trigger time.
 
-### Option 1: Download and Install Manually
+## Tech stack
 
-<a href="https://github.com/TheBoredTeam/boring.notch/releases/latest/download/boringNotch.dmg" target="_self"><img width="200" src="https://github.com/user-attachments/assets/e3179be1-8416-4b8a-b417-743e1ecc67d6" alt="Download for macOS" /></a>
+### macOS app
 
-Once downloaded, open the `.dmg` and move **Boring Notch** to your `/Applications` folder.
+- Swift
+- SwiftUI
+- Combine
+- Xcode
+- Swift Package Manager
 
-> [!IMPORTANT]
-> We don't have an Apple Developer account (yet 👀), so macOS will warn you that Boring Notch is from an unidentified developer on first launch. This is expected behavior.
->
-> You'll need to bypass this before the app will open. You only need to do this once. Use one of the methods below.
+### Browser integration
 
----
+- Google Chrome 116+
+- Manifest V3 Chrome extension
+- JavaScript ES modules
+- Chrome Native Messaging
+- Swift native messaging host
+- `DistributedNotificationCenter`
 
-#### Recommended: Terminal (Always Works)
+### Backend and AI
 
-This is the quickest and easiest method. It only requires a single command and works consistently for all users. System Settings can sometimes fail and won't work for non-admin users.
+- Node.js 20.10+
+- JavaScript with ES modules
+- Native Node.js HTTP server
+- REST and JSON
+- JSON Schema validation
+- `yt-dlp` for YouTube captions
+- Google Gemini API
+- Gemini 3.5 Flash-Lite by default
+- In-memory transcript and analysis caches
 
-After moving Boring Notch to your Applications folder, run:
+## How it works
 
-```bash
-xattr -dr com.apple.quarantine /Applications/boringNotch.app
+```text
+YouTube URL
+    -> local Node.js analysis API
+    -> yt-dlp caption retrieval
+    -> normalized timestamped transcript
+    -> one full-transcript Gemini request
+    -> validated insight timeline
+    -> SwiftUI macOS app
+
+YouTube player
+    -> Chrome content script
+    -> extension service worker
+    -> Chrome Native Messaging
+    -> Swift native host
+    -> playback timeline engine
+    -> notch insight card
 ```
 
-Then open the app normally.
+## Requirements
 
----
+- macOS 14 Sonoma or later
+- Xcode 16.4 or later
+- Node.js 20.10 or later
+- npm
+- Google Chrome 116 or later
+- [`yt-dlp`](https://github.com/yt-dlp/yt-dlp)
+- A Gemini API key for live analysis
 
-#### Alternative: System Settings
+Install `yt-dlp` with Homebrew:
 
-> [!NOTE]
-> This method doesn't work for all users. If this doesn't work, use the Terminal method above.
-
-1. Try to open the app — you'll see a security warning.
-2. Click **OK** to dismiss it.
-3. Open **System Settings** > **Privacy & Security**.
-4. Scroll to the bottom and click **Open Anyway** next to the Boring Notch warning.
-5. Confirm if prompted.
-
----
-
-### Option 2: Install via Homebrew
-
-You can also install using [Homebrew](https://brew.sh). The Homebrew installation automatically bypasses the macOS security warning described above.
-
-```bash
-brew install --cask TheBoredTeam/boring-notch/boring-notch
+```sh
+brew install yt-dlp
 ```
+
+## Setup
+
+### 1. Clone and configure
+
+```sh
+git clone https://github.com/AlNaheyan/ctp-hack.git
+cd ctp-hack
+npm install
+cp .env.example .env
+```
+
+For live analysis, update `.env`:
+
+```dotenv
+ANALYSIS_MODE=live
+PORT=3000
+HOST=127.0.0.1
+GEMINI_API_KEY=replace-with-your-key # lint-allow-secret
+LOG_PAYLOADS=false
+```
+
+Never commit `.env` or expose the Gemini API key in the extension or macOS app.
+
+### 2. Load the Chrome extension
+
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the repository's `extension/` directory.
+
+After editing extension code, click **Reload** on its extension card and refresh
+the YouTube page. Unpacked extensions do not automatically reload themselves.
+
+### 3. Start the analysis API
+
+Run the API separately in its own terminal:
+
+```sh
+PORT=3000 npm run api
+```
+
+Verify it:
+
+```sh
+curl http://127.0.0.1:3000/healthz
+```
+
+### 4. Build and launch CounterNotch
+
+In another terminal:
+
+```sh
+sh run.sh
+```
+
+The script:
+
+- finds the unpacked extension in the normal Chrome profile;
+- builds and registers the Swift native messaging host;
+- builds the macOS app;
+- replaces the previous app instance;
+- launches the app; and
+- opens YouTube in the normal Chrome profile.
+
+The API remains a separate process and is not started or stopped by `run.sh`.
 
 ## Usage
 
-- Launch the app, and voilà—your notch is now the coolest part of your screen.
-- Hover over the notch to see it expand and reveal all its secrets.
-- Use the controls to manage your music like a rockstar.
-- Click the star in your menu bar to customize your notch to your heart's content.
+1. Expand CounterNotch.
+2. Paste a public YouTube discussion or debate URL.
+3. Select **Analyze** and wait for the timeline to finish processing.
+4. Open the same video in Chrome and begin playback.
+5. CounterNotch displays argument insights as their timestamps are crossed.
 
-## 📋 Roadmap
-- [x] Playback live activity 🎧
-- [x] Calendar integration 📆
-- [x] Reminders integration ☑️
-- [x] Mirror 📷
-- [x] Charging indicator and current percentage 🔋
-- [x] Customizable gesture control 👆🏻
-- [x] Shelf functionality with AirDrop 📚
-- [x] Notch sizing customization, finetuning on different display sizes 🖥️
-- [x] System HUD replacements (volume, brightness, backlight) 🎚️💡⌨️
-- [ ] Bluetooth Live Activity (connect/disconnect for bluetooth devices) 
-- [ ] Weather integration ⛅️
-- [ ] Customizable Layout options 🛠️
-- [ ] Lock Screen Widgets 🔒
-- [ ] Extension system 🧩
-- [ ] Notifications (under consideration) 🔔
-<!-- - [ ] Clipboard history manager 📌 `Extension` -->
-<!-- - [ ] Download indicator of different browsers (Safari, Chromium browsers, Firefox) 🌍 `Extension`-->
-<!-- - [ ] Customizable function buttons 🎛️ -->
-<!-- - [ ] App switcher 🪄 -->
+## Development commands
 
-<!-- ## 🧩 Extensions
-> [!NOTE]
-> We’re hard at work on some awesome extensions! Stay tuned, and we’ll keep you updated as soon as they’re released. -->
+| Command | Purpose |
+| --- | --- |
+| `PORT=3000 npm run api` | Start the analysis API |
+| `npm run dev` | Start the API in the configured development mode |
+| `npm run mock` | Run the deterministic fixture server |
+| `npm run analyze` | Analyze the golden transcript with the offline provider |
+| `npm run analyze -- --live` | Analyze a transcript using Gemini |
+| `npm test` | Run backend and extension tests |
+| `npm run lint` | Parse, policy, and credential checks |
+| `npm run smoke` | Run the local mock smoke test |
+| `npm run native:register -- <extension-id>` | Register the native messaging host manually |
+| `npm run native:unregister` | Remove the native messaging host registration |
 
-## Building from Source
+## API
 
-### Prerequisites
+The local API listens on `127.0.0.1` and exposes:
 
-- **macOS 15.6 or later**
-- **Xcode 26 or later**
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/healthz` | Health, mode, model, and cache information |
+| `POST` | `/v1/analyze` | Analyze a YouTube URL or video ID |
+| `GET` | `/v1/analysis/:videoId` | Retrieve a cached analysis |
 
-### Installation
+Example:
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/TheBoredTeam/boring.notch.git
-   cd boring.notch
-   ```
+```sh
+curl -X POST http://127.0.0.1:3000/v1/analyze \
+  -H "content-type: application/json" \
+  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID"}'
+```
 
-2. **Open the Project in Xcode**:
-   ```bash
-   open boringNotch.xcodeproj
-   ```
+See [the API reference](docs/api/analysis-api.md) and
+[local setup guide](docs/setup/local-stack.md) for the complete contracts and
+configuration options.
 
-3. **Build and Run**:
-    - Click the "Run" button or press `Cmd + R`. Watch the magic unfold!
+## Repository structure
 
-## 🤝 Contributing
+```text
+boringNotch/                 SwiftUI macOS application
+Packages/DiscussionTimeline Analysis loading, cache, timeline, and event queue
+Packages/NativeMessagingHost Swift Chrome native messaging bridge
+extension/                   Manifest V3 playback observer
+backend/                     Transcript ingestion and Gemini analysis API
+contracts/                   Versioned JSON schemas
+fixtures/                    Deterministic test transcripts and analyses
+docs/                        Architecture, API, setup, and UX documentation
+scripts/                     Development and native-host utilities
+run.sh                       Build, register, and launch the macOS stack
+```
 
-We’re all about good vibes and awesome contributions! Read [CONTRIBUTING.md](CONTRIBUTING.md) to learn how you can join the fun!
+## Project team
 
-## Join our Discord Server
+- Evan (`Evandabest`)
+- Al Naheyan (`AlNaheyan`)
+- Hamet Coulibaly (`hamet-c`)
+- Maisha Tasnim Chowdhury
 
-<a href="https://discord.gg/GvYcYpAKTu" target="_blank"><img src="https://iili.io/28m3GHv.png" alt="Join The Boring Server!" style="height: 60px !important;width: 217px !important;" ></a>
+## Attribution
 
-## Star History
-<!-- BROKEN: GitHub now restricts the stargazer API for privacy reasons
-<a href="https://www.star-history.com/#TheBoredTeam/boring.notch&Timeline">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline" />
- </picture>
-</a>
--->
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-dark.svg">
-   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-light.svg">
-   <img src="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-light.svg" alt="TheBoredTeam/boring.notch GitHub star history">
- </picture>
+CounterNotch is based on
+[Boring Notch](https://github.com/TheBoredTeam/boring.notch). We are grateful
+to its authors and contributors for the macOS notch foundation. Existing
+third-party notices are preserved in
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
 
-## Support us on Ko-fi!
-<!-- <a href="https://www.buymeacoffee.com/jfxh67wvfxq" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-red.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a> -->
-<a href="https://www.ko-fi.com/alexander5015" target="_blank"><img src="https://github.com/user-attachments/assets//a76175ef-7e93-475a-8b67-4922ba5964c2" alt="Support us on Ko-fi" style="height: 70px !important;width: 346px !important;" ></a>
+## License
 
-## 🎉 Acknowledgments
-
-We would like to express our gratitude to the authors and maintainers of the open-source projects that made this possible. 
-
-## Notable Projects
-- **[MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter)** –  An open-source project that allowed us to use the Now Playing source in macOS 15.4+
-- **[NotchDrop](https://github.com/Lakr233/NotchDrop)** – An open-source project that has been instrumental in developing the first version of the "Shelf" feature in Boring Notch.
-
-For a full list of licenses and attributions, please see the [Third-Party Licenses](./THIRD_PARTY_LICENSES.md) file.
-
-### Icon credits: [@maxtron95](https://github.com/maxtron95)
-### Website credits: [@himanshhhhuv](https://github.com/himanshhhhuv)
-
-- **SwiftUI**: For making us look like coding wizards.
-- **You**: For being awesome and checking out **boring.notch**!
+This repository is licensed under the [GNU GPL v3](LICENSE).
